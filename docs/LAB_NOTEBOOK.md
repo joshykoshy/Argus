@@ -22,6 +22,7 @@ roadmap step.
 - [Step 0 - Environment and parity](#step-0---environment-and-parity)
 - [Step 1.1 - Ground-truth volumetrics](#step-11---ground-truth-volumetrics)
 - [Step 1.2 - Agreement analysis](#step-12---agreement-analysis-validated-on-damaged-masks)
+- [Step 1.3 - 3D renderer](#step-13---3d-renderer)
 - [Corrections log](#corrections-log)
 - [File index](#file-index)
 
@@ -34,8 +35,8 @@ roadmap step.
 | 0 | Environment, parity, data | done |
 | 1.1 | Ground-truth volumetrics (74 patients) | done |
 | 1.2 | Agreement analysis on damaged masks | done |
-| 1.3 | 3D renderer | in progress |
-| 1.4 | Diagnostic report panels 1, 2, 3, 5 | to do |
+| 1.3 | 3D renderer | done |
+| 1.4 | Diagnostic report panels 1, 2, 3, 5 | in progress |
 | 1.5 | Paper sections not needing results | to do |
 | 2.x | Teammate: M5-M7, 3D evaluation | waiting on teammate |
 | 3-5 | Real predictions, stats, write-up | blocked on 2.x |
@@ -478,6 +479,83 @@ also stays 0):
 
 ---
 
+## Step 1.3 - 3D renderer
+
+**Idea:** numbers say *how much* a prediction is wrong; a 3D picture shows
+*where*. The renderer draws the brain as a ghost, the tumor regions inside it
+in colour, truth and prediction side by side, and a third panel where the
+predicted tumor's skin is painted by how far each point is from the true
+boundary.
+
+**Scripts:**
+- `matlab/render_tumor_3d.m` - the renderer (function; reusable in Stage 3
+  with real predictions). Optional STL export of every surface (for 3D
+  printing or viewing in any mesh viewer).
+- `matlab/render3d_demo.m` - runs it on damaged masks with known answers and
+  asserts the error map reports them.
+
+**How it works, step by step:**
+
+```mermaid
+flowchart LR
+    A["FLAIR > 0<br/>(brain mask)"] --> B["blur, isosurface<br/>= ghost brain"]
+    C["Truth labels"] --> D["WT / TC / ET masks<br/>blur sigma 0.5, isosurface"]
+    E["Prediction labels"] --> F["same meshing"]
+    C --> G["signed distance map<br/>bwdist(outside) - bwdist(inside)"]
+    F --> H["sample the map at every<br/>predicted surface vertex (interp3)"]
+    G --> H
+    H --> I["vertex colour:<br/>blue inside, red outside"]
+```
+
+- **Meshes:** each mask is lightly blurred (sigma 0.5 voxel, the same as the
+  surface cross-check in Step 1.1) and turned into a triangle surface by
+  marching cubes (`isosurface`), then drawn with `patch`. WT and TC are
+  see-through so the inner regions stay visible.
+- **Error colour:** `bwdist` gives every voxel its distance to the nearest
+  truth voxel (positive outside) and to the nearest non-truth voxel
+  (negative inside). Their difference is a *signed distance map*: 0 on the
+  true boundary, +3 means 3 mm outside it, -3 means 3 mm inside it. Every
+  vertex of the predicted surface reads this map, so its colour says how far
+  and in which direction that bit of the prediction is off.
+
+**Validation (known answers):** `results/render3d_surface_error.csv`
+
+| Case | Mean signed error | Mean abs error | Expected | Pass |
+|---|---|---|---|---|
+| truth vs itself | -0.03 mm | 0.20 mm | ~0 (mesh smoothing only) | yes |
+| dilated 2 mm | **+2.04 mm** | 2.04 mm | +2 | yes |
+| eroded 2 mm | **-2.05 mm** | 2.05 mm | -2 | yes |
+| shifted 2 voxels | +0.13 mm | 1.32 mm | ~0 signed (one side +, other side -) | yes |
+| 3 blobs | +0.99 mm | 1.21 mm | blobs' vertices are far outside | as expected |
+
+The 0.2 mm "floor" when comparing truth with itself is the smoothing of the
+mesh; any real prediction error below ~0.5 mm is not resolvable with 1 mm
+voxels anyway.
+
+**Truth vs 2 mm dilation** - every point of the prediction is ~2 mm outside
+the truth, so the whole surface is uniformly light red:
+
+![Render dilate](../figures/render3d_dilate2.png)
+
+**Truth vs 2-voxel shift** - same volume, but the leading edge is red
+(outside the truth) and the trailing edge blue (inside). This is the
+picture of "volume right, location wrong" from Step 1.2:
+
+![Render shift](../figures/render3d_shift2.png)
+
+Also produced: `figures/render3d_self.png`, `render3d_erode2.png`,
+`render3d_blobs.png`.
+
+**Orientation note (for figure captions):** BraTS arrays are stored with
+dimension 1 = left-right and dimension 2 = front-back. The "side view" looks
+along the left-right axis; the "top view" looks down the head-foot axis.
+
+**Stage 3 use:** `render_tumor_3d(flair, truth, pred, spacing, png, title)`
+with `pred` from `results/predictions/M0_<id>_snr8_r0.5.nii.gz` and the M4
+equivalent gives the baseline-vs-proposed 3D comparison.
+
+---
+
 ## Corrections log
 
 Anything reported earlier that turned out wrong, so nothing silently changes.
@@ -512,3 +590,7 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `figures/agreement_damage_examples.png` | what each damage looks like |
 | `figures/agreement_bland_altman_wt.png` | Bland-Altman per damage |
 | `figures/agreement_boundary_error.png` | Steiner check + size effect |
+| `matlab/render_tumor_3d.m` | 3D renderer + error heatmap + STL export |
+| `matlab/render3d_demo.m` | Step 1.3 demo with known-answer checks |
+| `results/render3d_surface_error.csv` | surface error per demo case |
+| `figures/render3d_*.png` | 3D renders (self, dilate2, erode2, shift2, blobs) |

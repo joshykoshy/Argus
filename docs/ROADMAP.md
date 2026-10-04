@@ -31,7 +31,7 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       Tools: volume error %, Bland-Altman plot (shows bias and spread), ICC
       (one number for how well two measurements agree).
       -> `figures/agreement_*.png`, `results/agreement_validation.csv`
-- [ ] 1.3 **3D renderer** - see-through brain with colored tumor parts, truth vs
+- [x] 1.3 **3D renderer** - see-through brain with colored tumor parts, truth vs
       prediction side by side, plus a heatmap painting where the prediction is off
       and by how many mm. Tested on the damaged masks.
       -> `figures/render3d_*.png`
