@@ -1,189 +1,92 @@
-%% MATLAB Volumetrics & 3D Shape Biomarkers Engine
+% VOLUMETRICS  Tumor shape biomarkers for the 74 test patients.
 % ECTE408 Low-Field MRI Brain Tumor Segmentation Study
-% Extracts 3D volume, surface area, sphericity, compactness, and solidity via regionprops3.
-% Verifies <0.1% volume parity with Python evaluation engine.
+%
+% Run from repo root:  matlab -batch "run('matlab/volumetrics.m')"
+%
+% SOURCE = 'gt'   -> ground truth from the raw BraTS seg files (now).
+% SOURCE = 'pred' -> model predictions in results/predictions/ (Stage 3, only
+%                    once evaluation has written ALL files; the script refuses
+%                    to run on a partially filled folder so models never mix).
+%
+% Every mask, truth or prediction, goes through tumor_biomarkers.m, so the
+% measurement method is identical by construction. Output is one row per
+% (source, condition, patient, region); see tumor_biomarkers.m for columns.
 
-clear; clc; close all;
+%% ---- Configuration (paths relative to repo root) ----
+cd(fileparts(fileparts(mfilename('fullpath'))));
+SOURCE     = 'gt';
+DATA_ROOT  = 'archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData';
+SPLIT_FILE = 'data/splits/split_v1.json';
+PRED_DIR   = 'results/predictions';
+MODELS     = {'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7'};
+% python/evaluate.py saves NIfTI predictions for these 3 conditions only.
+CONDITIONS = {'clean', 'snr12_r0.75', 'snr8_r0.5'};
+OUT_CSV    = sprintf('results/volumetrics_%s.csv', SOURCE);
 
-%% 1. Setup Paths
-project_root = 'C:/Users/Mayan/.gemini/antigravity/scratch/ecte408';
-results_dir = fullfile(project_root, 'results');
-pred_nii_dir = fullfile(results_dir, 'predictions');
-gt_nii_dir   = fullfile(pred_nii_dir, 'ground_truth');
-splits_file  = fullfile(project_root, 'data', 'splits', 'split_v1.json');
-out_csv      = fullfile(results_dir, 'matlab_biomarkers.csv');
+addpath('matlab');
 
-split_text = fileread(splits_file);
-splits_data = jsondecode(split_text);
-test_patients = splits_data.test;
+%% ---- Patients and grades ----
+split = jsondecode(fileread(SPLIT_FILE));
+ids = split.test;
+map = readtable(fullfile(DATA_ROOT, 'name_mapping.csv'), 'TextType', 'string');
+[~, loc] = ismember(ids, map.BraTS_2020_subject_ID);
+assert(all(loc > 0), 'Some test IDs missing from name_mapping.csv');
+grades = cellstr(map.Grade(loc));
 
-models = {'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7'};
-conditions = {'clean', 'snr12_r0.75', 'snr8_r0.5'};
-
-fprintf('Extracting 3D regionprops3 biomarkers across %d test patients...\n', length(test_patients));
-
-records = {};
-row_count = 0;
-
-%% 2. Process Ground Truth First
-for p_idx = 1:length(test_patients)
-    p_id = test_patients{p_idx};
-    gt_file = fullfile(gt_nii_dir, sprintf('GT_%s.nii.gz', p_id));
-    
-    if ~exist(gt_file, 'file')
-        continue;
-    end
-    
-    info = niftiinfo(gt_file);
-    gt_vol = niftiread(info);
-    dx = info.PixelDimensions(1);
-    dy = info.PixelDimensions(2);
-    dz = info.PixelDimensions(3);
-    voxel_vol_cm3 = (dx * dy * dz) * 0.001;
-    
-    % Regions: WT={1,2,3}, TC={1,3}, ET={3}
-    regions = {'WT', 'TC', 'ET'};
-    region_masks = {
-        (gt_vol > 0), ...
-        (gt_vol == 1 | gt_vol == 3), ...
-        (gt_vol == 3)
-    };
-
-    for r_idx = 1:3
-        r_name = regions{r_idx};
-        mask_3d = region_masks{r_idx};
-        
-        props = compute_region_props(mask_3d, voxel_vol_cm3, dx, dy);
-        
-        row_count = row_count + 1;
-        records{row_count, 1} = 'GroundTruth';
-        records{row_count, 2} = p_id;
-        records{row_count, 3} = 'clean';
-        records{row_count, 4} = r_name;
-        records{row_count, 5} = props.vol_cm3;
-        records{row_count, 6} = props.surface_area;
-        records{row_count, 7} = props.sphericity;
-        records{row_count, 8} = props.compactness;
-        records{row_count, 9} = props.solidity;
-        records{row_count, 10} = props.equiv_diam;
-    end
-end
-
-%% 3. Process Predictions
-for m_idx = 1:length(models)
-    m_name = models{m_idx};
-    for c_idx = 1:length(conditions)
-        c_name = conditions{c_idx};
-        
-        for p_idx = 1:length(test_patients)
-            p_id = test_patients{p_idx};
-            pred_file = fullfile(pred_nii_dir, sprintf('%s_%s_%s.nii.gz', m_name, p_id, c_name));
-            
-            if ~exist(pred_file, 'file')
-                continue;
-            end
-            
-            info = niftiinfo(pred_file);
-            pred_vol = niftiread(info);
-            dx = info.PixelDimensions(1);
-            dy = info.PixelDimensions(2);
-            dz = info.PixelDimensions(3);
-            voxel_vol_cm3 = (dx * dy * dz) * 0.001;
-            
-            region_masks = {
-                (pred_vol > 0), ...
-                (pred_vol == 1 | pred_vol == 3), ...
-                (pred_vol == 3)
-            };
-            
-            for r_idx = 1:3
-                r_name = regions{r_idx};
-                mask_3d = region_masks{r_idx};
-                props = compute_region_props(mask_3d, voxel_vol_cm3, dx, dy);
-                
-                row_count = row_count + 1;
-                records{row_count, 1} = m_name;
-                records{row_count, 2} = p_id;
-                records{row_count, 3} = c_name;
-                records{row_count, 4} = r_name;
-                records{row_count, 5} = props.vol_cm3;
-                records{row_count, 6} = props.surface_area;
-                records{row_count, 7} = props.sphericity;
-                records{row_count, 8} = props.compactness;
-                records{row_count, 9} = props.solidity;
-                records{row_count, 10} = props.equiv_diam;
+%% ---- Build the job list: {source, condition, patient index, file} ----
+switch SOURCE
+    case 'gt'
+        jobs = cell(numel(ids), 4);
+        for p = 1:numel(ids)
+            jobs(p, :) = {'GroundTruth', 'clean', p, ...
+                fullfile(DATA_ROOT, ids{p}, [ids{p} '_seg.nii'])};
+        end
+    case 'pred'
+        jobs = cell(0, 4);
+        for m = 1:numel(MODELS)
+            for c = 1:numel(CONDITIONS)
+                for p = 1:numel(ids)
+                    jobs(end+1, :) = {MODELS{m}, CONDITIONS{c}, p, fullfile(PRED_DIR, ...
+                        sprintf('%s_%s_%s.nii.gz', MODELS{m}, ids{p}, CONDITIONS{c}))}; %#ok<SAGROW>
+                end
             end
         end
-    end
+    otherwise
+        error('SOURCE must be ''gt'' or ''pred''');
+end
+missing = jobs(~cellfun(@isfile, jobs(:, 4)), 4);
+if ~isempty(missing)
+    error('%d of %d input files missing (first: %s). Not running on a partial set.', ...
+        numel(missing), size(jobs, 1), missing{1});
 end
 
-%% 4. Save CSV Table
-if row_count > 0
-    header = {'model', 'patient_id', 'condition_id', 'region', 'volume_cm3', ...
-              'surface_area_mm2', 'sphericity', 'compactness_2d', 'solidity', 'equiv_diameter_mm'};
-    T = cell2table(records, 'VariableNames', header);
-    writetable(T, out_csv);
-    fprintf('Saved %d biomarker records to %s\n', row_count, out_csv);
+%% ---- Measure ----
+fprintf('Measuring %d volumes (%s)...\n', size(jobs, 1), SOURCE);
+tables = cell(size(jobs, 1), 1);
+tic;
+for j = 1:size(jobs, 1)
+    info = niftiinfo(jobs{j, 4});            % spacing from the header, not assumed
+    T = tumor_biomarkers(niftiread(info), info.PixelDimensions(1:3));
+    p = jobs{j, 3};
+    n = height(T);
+    T = [table(repmat(jobs(j, 1), n, 1), repmat(jobs(j, 2), n, 1), ...
+               repmat(ids(p), n, 1), repmat(grades(p), n, 1), ...
+               'VariableNames', {'source', 'condition', 'patient_id', 'grade'}), T]; %#ok<AGROW>
+    tables{j} = T;
+    if mod(j, 10) == 0 || j == size(jobs, 1)
+        fprintf('  %d/%d  (%.0f s)\n', j, size(jobs, 1), toc);
+    end
 end
+out = vertcat(tables{:});
+writetable(out, OUT_CSV);
+fprintf('Saved %d rows to %s\n', height(out), OUT_CSV);
 
-%% Helper Function
-function props = compute_region_props(mask_3d, voxel_vol_cm3, dx, dy)
-    voxel_count = sum(mask_3d(:));
-    vol_cm3 = voxel_count * voxel_vol_cm3;
-    
-    if voxel_count < 5
-        props.vol_cm3 = vol_cm3;
-        props.surface_area = 0;
-        props.sphericity = 0;
-        props.compactness = 0;
-        props.solidity = 0;
-        props.equiv_diam = 0;
-        return;
-    end
-    
-    % regionprops3
-    try
-        rp = regionprops3(mask_3d, 'SurfaceArea', 'Solidity', 'EquivDiameter');
-        if ~isempty(rp) && height(rp) > 0
-            sa = double(max(rp.SurfaceArea));
-            sol = double(max(rp.Solidity));
-            eq_d = double(max(rp.EquivDiameter));
-        else
-            sa = 0; sol = 0; eq_d = 0;
-        end
-    catch
-        sa = 0; sol = 0; eq_d = 0;
-    end
-    
-    % 3D Sphericity psi = pi^(1/3) * (6 * V)^(2/3) / A (where V is mm3 = cm3 * 1000)
-    vol_mm3 = vol_cm3 * 1000.0;
-    if sa > 0
-        sphericity = (pi^(1/3)) * ((6.0 * vol_mm3)^(2/3)) / sa;
-    else
-        sphericity = 0;
-    end
-    
-    % 2D Compactness P^2 / (4*pi*A) on largest axial slice
-    axial_areas = squeeze(sum(sum(mask_3d, 1), 2));
-    [max_area_vox, best_z] = max(axial_areas);
-    if max_area_vox > 5
-        slice_2d = mask_3d(:, :, best_z);
-        rp2d = regionprops(slice_2d, 'Perimeter', 'Area');
-        if ~isempty(rp2d)
-            p = double(max([rp2d.Perimeter])) * ((dx + dy)/2);
-            a = double(max([rp2d.Area])) * (dx * dy);
-            compactness = (p^2) / (4 * pi * a + 1e-6);
-        else
-            compactness = 0;
-        end
-    else
-        compactness = 0;
-    end
-    
-    props.vol_cm3 = vol_cm3;
-    props.surface_area = sa;
-    props.sphericity = sphericity;
-    props.compactness = compactness;
-    props.solidity = sol;
-    props.equiv_diam = eq_d;
+%% ---- Quick summary to sanity-check by eye ----
+for reg = {'WT', 'TC', 'ET'}
+    r = out(strcmp(out.region, reg{1}), :);
+    fprintf(['%s: median volume %.1f cm3 [%.1f-%.1f], empty in %d patients, ', ...
+             'median sphericity %.3f (mesh %.3f), median pieces %d, max %d\n'], ...
+        reg{1}, median(r.volume_cm3), min(r.volume_cm3), max(r.volume_cm3), ...
+        sum(r.voxels == 0), median(r.sphericity, 'omitnan'), ...
+        median(r.sphericity_mesh, 'omitnan'), median(r.n_components), max(r.n_components));
 end
