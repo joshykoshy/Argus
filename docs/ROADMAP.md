@@ -40,7 +40,7 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       with no enhancing tumor). Panels: original, degraded, truth, band split.
       Panel 4 (prediction) waits for Stage 3.
       -> `figures/diagnostic_*.png`, selection rule written down
-- [ ] 1.5 **Write the paper parts that don't need results** - introduction (why
+- [x] 1.5 **Write the paper parts that don't need results** - introduction (why
       low-field MRI matters), dataset and splits, how we simulate bad scans,
       the frequency split at D0=0.20, MATLAB-Python check, spectral analysis.
 
@@ -51,7 +51,9 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       -> `results/predictions/*.nii.gz` + `results/raw_metrics.csv`
 - [ ] 2.4 Settle the open questions with the teammate (raise early, they shape
       what we can claim):
-  - [ ] Was M4 trained on clean scans only, or with degraded ones like M1?
+  - [x] Was M4 trained on clean scans only, or with degraded ones like M1?
+        -> answered from code: with degradation (see LAB_NOTEBOOK C3)
+  - [ ] Discuss critical findings C1, C2, C4, C5, C7, C8 (LAB_NOTEBOOK.md)
   - [ ] H3 names the wrong comparison model (M6 still uses the split) - fix wording
   - [ ] Can M0-M4 be evaluated now, before M5-M7 finish, to save time?
 

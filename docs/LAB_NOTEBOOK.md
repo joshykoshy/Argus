@@ -24,6 +24,8 @@ roadmap step.
 - [Step 1.2 - Agreement analysis](#step-12---agreement-analysis-validated-on-damaged-masks)
 - [Step 1.3 - 3D renderer](#step-13---3d-renderer)
 - [Step 1.4 - Diagnostic report](#step-14---diagnostic-report-panels-1-2-3-5)
+- [Step 1.5 - Paper sections](#step-15---paper-sections-that-do-not-need-results)
+- [Ready for Stage 3](#ready-for-stage-3-what-to-run-when-predictions-arrive)
 - [Corrections log](#corrections-log)
 - [File index](#file-index)
 
@@ -38,7 +40,7 @@ roadmap step.
 | 1.2 | Agreement analysis on damaged masks | done |
 | 1.3 | 3D renderer | done |
 | 1.4 | Diagnostic report panels 1, 2, 3, 5 | done (panel 4 waits for predictions) |
-| 1.5 | Paper sections not needing results | in progress |
+| 1.5 | Paper sections not needing results | done (draft) |
 | 2.x | Teammate: M5-M7, 3D evaluation | waiting on teammate |
 | 3-5 | Real predictions, stats, write-up | blocked on 2.x |
 
@@ -147,6 +149,32 @@ with no tumor (and slices outside the brain). A model that has never seen a
 tumor-free slice may predict spurious tumor there. The morphometrics built
 here measure exactly this (component count, volume outside the largest
 component), so Stage 3 will show whether it happens.
+
+### C7. One seed, 5 epochs, against a config of 3 seeds, 20 epochs
+
+`configs/base.yaml` specifies `epochs: 20` and `seeds: [0, 1, 2]`; every
+trained model in `results/M*/` has only `seed_0` with 5 epochs (DEV-003).
+With one seed there is no estimate of how much a model's score changes just
+from random initialisation. The M1 vs M2 pair (C1) is effectively that
+estimate: same code, same seed, and final validation mean Dice still differs
+by 0.001 and WT Dice at SNR 8 by 0.009. Model differences of a similar size
+cannot be attributed to architecture. At least 3 seeds for M0, M1 and M4
+would make H2 testable.
+
+### C8. Spectral "findings" are hard-coded text; one claim does not hold
+
+`matlab/spectral_analysis.m` writes `docs/FINDINGS_SPECTRAL.md` with fixed
+`fprintf` sentences ("over 92%", "drops below 0 dB"): they are not computed
+from the data, and the script uses unseeded noise. Measured independently
+(`matlab/spectral_check.m`, Step 1.5):
+
+| Claim | Measured | Verdict |
+|---|---|---|
+| > 92 % of clean power in D < 0.20 | FLAIR 95.1 % (min 92.5 %); T1ce 91.9 % (min 88.4 %), excl. DC | roughly; not "over 92 %" for every T1ce slice |
+| high band < 0 dB SNR at SNR 8-12, r <= 0.75 | +1.0 to +5.6 dB; never below 0 in any condition | **not supported** |
+
+So `FINDINGS_SPECTRAL.md` should not be cited; `docs/PAPER_DRAFT.md`
+Section 2.6 uses the measured values.
 
 ### Checked and fine
 
@@ -643,6 +671,77 @@ Other cases: `figures/diagnostic_1_BraTS20_Training_008.png`,
 
 ---
 
+## Step 1.5 - Paper sections that do not need results
+
+**Output:** [`PAPER_DRAFT.md`](PAPER_DRAFT.md) - Introduction, Methods
+2.1-2.10, the Discussion points and Limitations already established, and a
+reference list. Every number is traceable to a script in this repo; every
+open team decision is marked `[TEAM: ...]`; every citation is marked
+"verify" (written from memory, must be checked against the source).
+
+**While writing it, one more thing was measured rather than copied:** the
+spectral analysis (C8).
+
+**Script:** `matlab/spectral_check.m` - first 12 test patients (same sample
+as the teammate's export), largest-tumor slice, 192 x 192 crop, raw
+intensities, seed 42.
+
+**Idea in plain words.** Picture the image as a sum of waves: slow waves
+make the smooth shading, fast waves make edges and texture. "Power at low
+frequency" = how much of the picture is smooth shading. "Band SNR" = in a
+given range of wave speeds, how strong is the real anatomy compared with
+what the degradation changed (noise plus lost sharpness).
+
+![Band SNR](../figures/spectral_band_snr.png)
+
+*Solid = low band (D < 0.20), dashed = high band. Colours = resolution
+level. Right is worse.*
+
+| Nominal SNR | r | FLAIR low / high (dB) | T1ce low / high (dB) |
+|---|---|---|---|
+| 30 | 1.0 | 28.0 / 14.1 | 26.6 / 14.8 |
+| 12 | 0.75 | 19.9 / 4.9 | 18.5 / 5.6 |
+| 8 | 1.0 | 16.5 / 2.7 | 15.1 / 3.4 |
+| 8 | 0.5 | 16.4 / 1.0 | 15.1 / 1.7 |
+
+What it shows:
+1. **The premise holds:** degradation lands mostly in the high band. The
+   low band stays above 15 dB (error < 3 % of anatomy) even at the worst
+   condition; the high band loses 12-13 dB.
+2. **Resolution loss is a high-band phenomenon:** at SNR 30 the high band
+   drops 14.1 -> 9.3 -> 5.5 dB as r goes 1 -> 0.75 -> 0.5; the low band
+   barely moves.
+3. **But nothing ever becomes noise-dominated** (no band below 0 dB), and
+   the low band, which carries 92-97 % of the image, is nearly untouched.
+   That is the spectral explanation of C2: there is not much damage for a
+   robustness method to undo.
+
+---
+
+## Ready for Stage 3: what to run when predictions arrive
+
+Only when the teammate confirms **all** of `results/predictions/` is written
+(8 models x 74 patients x 3 conditions + `ground_truth/`):
+
+1. `matlab/check_crop_retention.m` already done; additionally compare
+   `results/predictions/ground_truth/GT_*.nii.gz` volumes with
+   `results/volumetrics_gt.csv` (should match to the 18-voxel crop loss).
+2. `matlab/volumetrics.m` with `SOURCE = 'pred'` ->
+   `results/volumetrics_pred.csv` (refuses to run on a partial folder).
+3. Agreement per model x condition: `agreement_stats(gt.volume_cm3,
+   pred.volume_cm3)` for each region - same function validated in Step 1.2.
+   Also report sphericity agreement and extra components vs truth.
+4. `matlab/diagnostic_report.m` with `USE_PREDICTIONS = true` (panel 4).
+5. `render_tumor_3d` for M0 vs M4 at `snr8_r0.5` on the 5 selected patients.
+6. Conventions to agree with the teammate for Dice on empty ET (case 5
+   type patients): BraTS convention is Dice = 1 if both empty, 0 if only one
+   is empty. Check `python/metrics/evaluation.py` uses the same.
+7. The other 10 conditions have no NIfTI predictions; their volumes are in
+   `results/raw_metrics.csv` (`vol_pred_*_cm3`), enough for volume agreement
+   but not for shape or fragmentation.
+
+---
+
 ## Corrections log
 
 Anything reported earlier that turned out wrong, so nothing silently changes.
@@ -684,3 +783,7 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `matlab/diagnostic_report.m` | Step 1.4 selection rule + per-patient report |
 | `results/diagnostic_selection.csv` | the 5 selected patients and why |
 | `figures/diagnostic_<n>_<id>.png` | the 5 reports |
+| `matlab/spectral_check.m` | measured spectral claims (C8, Section 2.6) |
+| `results/spectral_check.csv` | per patient x modality x condition band SNR |
+| `figures/spectral_band_snr.png` | band SNR figure |
+| `docs/PAPER_DRAFT.md` | Introduction + Methods draft |
