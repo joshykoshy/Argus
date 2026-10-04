@@ -11,7 +11,8 @@ function T = tumor_biomarkers(labels, spacing)
 %
 %   T       - 3-row table (WT, TC, ET) with:
 %     voxels, volume_cm3          count and physical volume
-%     surface_area_mm2            regionprops3 SurfaceArea (primary)
+%     surface_area_mm2            regionprops3 SurfaceArea summed over the
+%                                 26-connected pieces (primary)
 %     surface_area_mesh_mm2       marching-cubes mesh after Gaussian sigma=0.5
 %                                 smoothing (cross-check)
 %     sphericity, sphericity_mesh pi^(1/3) * (6V)^(2/3) / A, 1 = perfect ball
@@ -69,11 +70,17 @@ r.frac_outside_largest = 1 - max(sizes) / n;
 [i, j, k] = ind2sub(size(m), find(m));
 box = padarray(m(min(i):max(i), min(j):max(j), min(k):max(k)), [3 3 3]);
 
-% uint8(box) labels every tumor voxel as region 1, so all pieces are measured
-% together as one region (surface of all pieces, axes of the whole tumor).
-rp = regionprops3(uint8(box), 'SurfaceArea', 'PrincipalAxisLength');
+% Surface area: measured per connected piece, then summed. regionprops3's
+% SurfaceArea on a single label covering several disconnected pieces returns
+% the area of ONE piece only (two equal spheres -> area of one; sphere + a
+% far stray voxel -> 3 mm^2). Verified on R2026b; see test 6.
+sa = regionprops3(bwconncomp(box, 26), 'SurfaceArea');
 V = n * s^3;                                        % mm^3
-r.surface_area_mm2 = rp.SurfaceArea(1) * s^2;
+r.surface_area_mm2 = sum(sa.SurfaceArea) * s^2;
+% Principal axes: uint8(box) labels all tumor voxels as region 1, so the axes
+% describe the whole tumor (all pieces). This property IS computed over every
+% voxel of the label, unlike SurfaceArea.
+rp = regionprops3(uint8(box), 'PrincipalAxisLength');
 r.sphericity = pi^(1/3) * (6 * V)^(2/3) / r.surface_area_mm2;
 ax = sort(rp.PrincipalAxisLength(1, :), 'descend');
 r.elongation = ax(2) / ax(1);                       % 0/0 -> NaN for 1 voxel

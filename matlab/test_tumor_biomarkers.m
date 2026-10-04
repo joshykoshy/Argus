@@ -55,6 +55,21 @@ T = tumor_biomarkers(lab, [1 1 1]);
 assert(T.n_components(1) == 2, 'two components');
 assert(abs(T.frac_outside_largest(1) - 27 / T.voxels(1)) < 1e-12, 'fraction outside largest');
 
+% 6b. Surface area must include EVERY piece. Regression test for the
+%     regionprops3 single-label bug: two identical separate spheres must give
+%     twice the area of one, and both methods must agree on that.
+one = (x + 20).^2 + y.^2 + z.^2 <= 10^2;
+two = one | (x - 20).^2 + y.^2 + z.^2 <= 10^2;
+T1 = tumor_biomarkers(uint8(2 * one), [1 1 1]);
+T2 = tumor_biomarkers(uint8(2 * two), [1 1 1]);
+fprintf('Two spheres / one sphere surface: regionprops3 %.3f, mesh %.3f (expect 2)\n', ...
+    T2.surface_area_mm2(1) / T1.surface_area_mm2(1), ...
+    T2.surface_area_mesh_mm2(1) / T1.surface_area_mesh_mm2(1));
+assert(abs(T2.surface_area_mm2(1) / T1.surface_area_mm2(1) - 2) < 1e-6, 'multi-piece SA');
+assert(abs(T2.surface_area_mesh_mm2(1) / T1.surface_area_mesh_mm2(1) - 2) < 1e-3, 'multi-piece mesh SA');
+% Two spheres side by side along x: the whole tumor is now elongated.
+assert(T2.elongation(1) < 0.3, 'elongation uses all pieces');
+
 % 7. Label conventions: ET as 4 (raw BraTS) and as 3 (Python predictions)
 %    give identical results. Core = NCR(1) + ET, WT adds edema(2).
 core = x.^2 + y.^2 + z.^2 <= 8^2;
