@@ -25,7 +25,7 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       Surface measured two ways (voxel count vs smoothed mesh) because blocky
       voxels overestimate surface area.
       -> `results/volumetrics_gt.csv`
-- [ ] 1.2 **Agreement analysis, validated on fake damage** - deliberately damage the
+- [x] 1.2 **Agreement analysis, validated on fake damage** - deliberately damage the
       true outlines (grow by 1-2 voxels, shrink, shift, cut holes, add fake blobs),
       then check that the comparison tools report exactly the error we caused.
       Tools: volume error %, Bland-Altman plot (shows bias and spread), ICC

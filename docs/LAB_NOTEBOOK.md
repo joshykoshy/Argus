@@ -21,6 +21,7 @@ roadmap step.
 - [The pipeline in one picture](#the-pipeline-in-one-picture)
 - [Step 0 - Environment and parity](#step-0---environment-and-parity)
 - [Step 1.1 - Ground-truth volumetrics](#step-11---ground-truth-volumetrics)
+- [Step 1.2 - Agreement analysis](#step-12---agreement-analysis-validated-on-damaged-masks)
 - [Corrections log](#corrections-log)
 - [File index](#file-index)
 
@@ -32,8 +33,8 @@ roadmap step.
 |---|---|---|
 | 0 | Environment, parity, data | done |
 | 1.1 | Ground-truth volumetrics (74 patients) | done |
-| 1.2 | Agreement analysis on damaged masks | in progress |
-| 1.3 | 3D renderer | to do |
+| 1.2 | Agreement analysis on damaged masks | done |
+| 1.3 | 3D renderer | in progress |
 | 1.4 | Diagnostic report panels 1, 2, 3, 5 | to do |
 | 1.5 | Paper sections not needing results | to do |
 | 2.x | Teammate: M5-M7, 3D evaluation | waiting on teammate |
@@ -352,6 +353,131 @@ Observations:
 
 ---
 
+## Step 1.2 - Agreement analysis, validated on damaged masks
+
+**Idea:** in Stage 3 we will ask "does the predicted tumor volume agree with
+the true volume?". Before trusting the code that answers that, feed it
+outlines where **we already know the answer**: take the true outline, damage
+it in a controlled way, and check the code reports exactly that damage. A
+scale is checked with known weights before weighing anything unknown; this
+is the same idea.
+
+**Scripts:**
+- `matlab/damage_mask.m` - applies one controlled damage to a label volume
+  and returns the exact expected change where one exists.
+- `matlab/agreement_stats.m` - Bland-Altman bias and limits, ICC(A,1),
+  ICC(C,1), % volume error, bootstrap 95 % CIs (fixed seed 42).
+  Hand-written (no Statistics Toolbox).
+- `matlab/test_agreement_stats.m` - reproduces the published Shrout &
+  Fleiss (1979) worked example: ICC(2,1) = 0.290 (published 0.29),
+  ICC(3,1) = 0.715 (published 0.71); plus perfect-agreement, constant-offset,
+  proportional and NaN cases. All pass.
+- `matlab/agreement_validation.m` - runs 7 damage types on all 74 patients
+  (~9 min), writes the CSVs and the three figures below.
+
+**Outputs:** `results/agreement_damaged_biomarkers.csv` (1554 rows,
+patient x damage x region, full biomarkers + Dice),
+`results/agreement_validation.csv` (summary with CIs).
+
+### The three agreement tools in plain words
+
+| Tool | Question it answers | Reading it |
+|---|---|---|
+| **% volume error** | "by how much is this patient's volume off?" | 100 (pred - true) / true |
+| **Bland-Altman plot** | "is there a systematic over/under-estimate, and how big is the spread?" | x = average of the two, y = difference. Solid line = **bias** (average error). Dashed lines = **limits of agreement**: 95 % of patients' errors fall between them |
+| **ICC** (intraclass correlation) | "can the two measurements be swapped for one another?" | 1 = perfect. **ICC(A,1)** (absolute) is lowered by a constant offset; **ICC(C,1)** (consistency) only asks whether the ranking is right. A big gap between them = "right ordering, wrong level" |
+
+### The damage menu
+
+![Damage examples](../figures/agreement_damage_examples.png)
+
+*One test patient, axial FLAIR, zoomed on the tumor. Coloured lines are the
+damaged outlines, white dotted lines the original. In this patient the tumor
+core's outer edge coincides with the enhancing ring (the core is the ring
+plus the dead tissue inside it), so the orange TC line sits under the red ET
+line except where erosion has destroyed the thin ring (erode 1-2 mm). The
+blobs panel shows the full slice through one of the three added blobs.*
+
+| Damage | What it imitates in a real model | Known answer |
+|---|---|---|
+| dilate 1 / 2 mm | over-segmentation, outline drawn too wide | volume added ~ surface area x offset |
+| erode 1 / 2 mm | under-segmentation, too tight | volume removed ~ surface area x offset |
+| shift 2 voxels | registration / position error | volume unchanged |
+| delete r = 8 mm ball | a missed part of the tumor | removed voxels counted exactly |
+| 3 blobs r = 3 | scattered false-positive spots elsewhere in the brain | +3 x 123 voxels = +0.369 cm^3, +3 pieces |
+
+### Did the code report the known answers?
+
+| Check | Expected | Measured | Pass |
+|---|---|---|---|
+| delete: volume removed | exact voxel count | deviation **0 voxels**, every patient, every region | yes |
+| blobs: volume added | +0.369 cm^3 | bias **+0.369**, SD 0 | yes |
+| blobs: extra pieces | +3 | median **+3** | yes |
+| shift: volume | unchanged | bias **0.000**, ICC 1.000 | yes |
+| dilate 1 mm: volume added vs Steiner prediction | ratio 1 | median ratio **1.014** (WT), 1.032 (TC), 1.006 (ET) | yes |
+| dilate 2 mm | ratio ~1 | 0.98 / 1.02 / 0.96 | yes |
+| erode 2 mm | ratio ~1, falling where thin parts vanish | 0.94 / 0.92 / **0.87** | as expected |
+
+**The Steiner prediction, explained.** Growing any smooth shape outward by a
+thin layer d adds roughly (surface area) x d of volume, like painting a
+coat onto it. On a voxel grid the effective layer thickness is not exactly
+d, so it was calibrated once on a digital sphere (R = 30): growing by 1 mm
+adds 0.851 mm^3 per mm^2 of surface; 2 mm adds 1.83; eroding removes 0.814
+and 1.65. That single sphere-derived factor then predicts each real tumor's
+change from its own surface area:
+
+![Boundary error](../figures/agreement_boundary_error.png)
+
+*(a) Every dot is one patient-region after 1 mm dilation. They lie on the
+identity line: the code's volumes behave exactly as the geometry says they
+must. (b) The same 1 mm boundary error expressed as a percentage of each
+region's volume.*
+
+### Bland-Altman results (whole tumor)
+
+![Bland-Altman](../figures/agreement_bland_altman_wt.png)
+
+Full table: `results/agreement_validation.csv`. Key rows (bias with 95 %
+bootstrap CI, n = 74; ET n = 74 including the 5 empty, whose damaged volume
+also stays 0):
+
+| Damage | Region | Bias (cm^3) | Median abs % error | ICC(A,1) [95 % CI] | ICC(C,1) | Mean Dice |
+|---|---|---|---|---|---|---|
+| dilate 1 mm | WT | +16.1 [14.5, 17.7] | 16.8 | 0.957 [0.944, 0.965] | 0.993 | 0.915 |
+| dilate 1 mm | ET | +7.3 [6.0, 8.7] | **48.2** | 0.883 [0.839, 0.913] | 0.950 | 0.796 |
+| erode 2 mm | ET | -12.4 [-14.8, -10.1] | **79.7** | 0.430 [0.287, 0.543] | 0.648 | 0.340 |
+| shift 2 vox | ET | 0.00 | 0.0 | 1.000 | 1.000 | **0.707** |
+| 3 blobs | WT | +0.37 | 0.5 | **1.000** | 1.000 | **0.997** |
+
+### What this teaches (for the Discussion section)
+
+1. **A 1 mm outline error is clinically small for WT and large for ET.** The
+   same one-voxel error changes whole-tumor volume by ~17 % but enhancing
+   tumor by ~48 % (and up to >100 % for ET regions under ~2 cm^3, panel b).
+   ET is thin (a shell) and small, so it has a lot of surface per unit of
+   volume. Expect ET volume to be the first biomarker to break under
+   degradation, and expect ET Dice to be lowest for the same reason.
+2. **ICC alone is a weak verdict.** A systematic 17 % over-estimate of every
+   tumor still scores ICC(A,1) = 0.957, "excellent" by the usual > 0.9 rule.
+   Always report the Bland-Altman bias next to ICC. The gap ICC(C,1) 0.993
+   vs ICC(A,1) 0.957 is the signature of a systematic offset.
+3. **Volume agreement does not mean location agreement.** Shifting the
+   tumor 2 mm leaves every volume perfect (ICC 1.000) while ET Dice falls to
+   0.71. Volume and overlap are different questions; the paper needs both.
+4. **Neither Dice nor volume notices scattered false positives.** Three
+   spurious 0.12 cm^3 blobs elsewhere in the brain leave Dice at 0.997 and
+   ICC at 1.000. Only the component count (+3) flags them, and HD95 (Python)
+   would too. Clinically such a blob could be read as a second lesion.
+   This is why `n_components` and `frac_outside_largest` are in the table,
+   and why Stage 3 should report them (see also C6: models trained only on
+   tumor slices may create exactly this).
+5. **Fragment count moves in both directions.** Dilation merges nearby
+   fragments (median -1 to -2 pieces); 2 mm erosion splits thin ET rims
+   (median +2 pieces). A change in piece count is a boundary-quality signal,
+   not only a false-positive signal.
+
+---
+
 ## Corrections log
 
 Anything reported earlier that turned out wrong, so nothing silently changes.
@@ -377,3 +503,12 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `results/crop_tumor_retention.csv` | tumor voxels lost to crop, per patient |
 | `figures/surface_area_validation.png` | surface method validation |
 | `figures/volumetrics_gt_cohort.png` | cohort distributions |
+| `matlab/damage_mask.m` | controlled synthetic damage |
+| `matlab/agreement_stats.m` | Bland-Altman, ICC, % error, bootstrap CIs |
+| `matlab/test_agreement_stats.m` | its tests (Shrout & Fleiss reference) |
+| `matlab/agreement_validation.m` | Step 1.2 driver + figures |
+| `results/agreement_damaged_biomarkers.csv` | biomarkers of every damaged mask |
+| `results/agreement_validation.csv` | agreement summary per damage x region |
+| `figures/agreement_damage_examples.png` | what each damage looks like |
+| `figures/agreement_bland_altman_wt.png` | Bland-Altman per damage |
+| `figures/agreement_boundary_error.png` | Steiner check + size effect |
