@@ -1,0 +1,16 @@
+# Ignore large data files and model weights
+data/cache/
+data/raw/
+*.npz
+*.nii
+*.nii.gz
+results/predictions/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.DS_Store
+
+# Keep result logs and checkpoints (tracked)
+!results/**/*.csv
+!results/**/*.pt

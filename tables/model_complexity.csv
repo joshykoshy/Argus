@@ -1,0 +1,9 @@
+model_id,architecture,parameters,params_millions,diff_from_m0_pct,capacity_matched_status
+M0,UNetSingle,4368339,4.368,0.0,MATCHED (< 10%)
+M1,UNetSingle,4368339,4.368,0.0,MATCHED (< 10%)
+M2,UNetSingle,4368339,4.368,0.0,MATCHED (< 10%)
+M3,M3ModelWrapper,4368339,4.368,0.0,MATCHED (< 10%)
+M4,M4ModelWrapper,4172745,4.173,-4.48,MATCHED (< 10%)
+M5,M5ModelWrapper,4368339,4.368,0.0,MATCHED (< 10%)
+M6,M6ModelWrapper,4369203,4.369,0.02,MATCHED (< 10%)
+M7,M7ModelWrapper,4172745,4.173,-4.48,MATCHED (< 10%)
