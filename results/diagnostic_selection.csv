@@ -1,0 +1,6 @@
+case,role,patient_id,grade,wt_volume_cm3,target_cm3,group_size
+1,HGG small (10th pct),BraTS20_Training_008,HGG,33.446,33.1686,59
+2,HGG typical (median),BraTS20_Training_167,HGG,80.769,80.769,59
+3,HGG large (90th pct),BraTS20_Training_236,HGG,169.918,170.72,59
+4,LGG with ET (median),BraTS20_Training_292,LGG,77.02,78.3225,10
+5,LGG no ET (median),BraTS20_Training_281,LGG,143.067,143.067,5

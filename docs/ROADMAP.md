@@ -35,7 +35,7 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       prediction side by side, plus a heatmap painting where the prediction is off
       and by how many mm. Tested on the damaged masks.
       -> `figures/render3d_*.png`
-- [ ] 1.4 **Diagnostic report (4 of 5 panels)** - pick 5 example patients by a fixed
+- [x] 1.4 **Diagnostic report (4 of 5 panels)** - pick 5 example patients by a fixed
       rule using only true outlines (small to large tumors, both HGG and LGG, one
       with no enhancing tumor). Panels: original, degraded, truth, band split.
       Panel 4 (prediction) waits for Stage 3.

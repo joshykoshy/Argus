@@ -23,6 +23,7 @@ roadmap step.
 - [Step 1.1 - Ground-truth volumetrics](#step-11---ground-truth-volumetrics)
 - [Step 1.2 - Agreement analysis](#step-12---agreement-analysis-validated-on-damaged-masks)
 - [Step 1.3 - 3D renderer](#step-13---3d-renderer)
+- [Step 1.4 - Diagnostic report](#step-14---diagnostic-report-panels-1-2-3-5)
 - [Corrections log](#corrections-log)
 - [File index](#file-index)
 
@@ -36,8 +37,8 @@ roadmap step.
 | 1.1 | Ground-truth volumetrics (74 patients) | done |
 | 1.2 | Agreement analysis on damaged masks | done |
 | 1.3 | 3D renderer | done |
-| 1.4 | Diagnostic report panels 1, 2, 3, 5 | in progress |
-| 1.5 | Paper sections not needing results | to do |
+| 1.4 | Diagnostic report panels 1, 2, 3, 5 | done (panel 4 waits for predictions) |
+| 1.5 | Paper sections not needing results | in progress |
 | 2.x | Teammate: M5-M7, 3D evaluation | waiting on teammate |
 | 3-5 | Real predictions, stats, write-up | blocked on 2.x |
 
@@ -556,6 +557,92 @@ equivalent gives the baseline-vs-proposed 3D comparison.
 
 ---
 
+## Step 1.4 - Diagnostic report (panels 1, 2, 3, 5)
+
+**Idea:** one page per patient that a reader can take in at a glance: the
+scan, what the degraded scan looks like, where the tumor really is, what the
+model said (Stage 3), and what the model actually receives after the
+frequency split. Five patients, chosen by a rule fixed in advance so no one
+can say the examples were cherry-picked.
+
+**Script:** `matlab/diagnostic_report.m` (rewritten; the old version had
+the teammate's absolute path, picked the first 5 test IDs, and needed
+predictions). Outputs `figures/diagnostic_<case>_<id>.png` and
+`results/diagnostic_selection.csv`.
+
+### Selection rule (for the paper's Methods)
+
+> Five test patients were selected for qualitative display before any model
+> predictions were inspected, using only ground-truth whole-tumor (WT)
+> volume, enhancing-tumor (ET) presence and grade: the HGG patients (with ET)
+> closest to the 10th, 50th and 90th percentile of HGG WT volume; the LGG
+> patient with ET closest to that subgroup's median WT volume; and the LGG
+> patient without ET closest to that subgroup's median WT volume. Ties were
+> broken by lowest patient ID.
+
+| Case | Role | Patient | Grade | WT (cm^3) | Group target | Group size |
+|---|---|---|---|---|---|---|
+| 1 | HGG small (10th pct) | BraTS20_Training_008 | HGG | 33.4 | 33.2 | 59 |
+| 2 | HGG typical (median) | BraTS20_Training_167 | HGG | 80.8 | 80.8 | 59 |
+| 3 | HGG large (90th pct) | BraTS20_Training_236 | HGG | 169.9 | 170.7 | 59 |
+| 4 | LGG with ET (median) | BraTS20_Training_292 | LGG | 77.0 | 78.3 | 10 |
+| 5 | LGG no ET (median) | BraTS20_Training_281 | LGG | 143.1 | 143.1 | 5 |
+
+### The panels, and what each one is for
+
+- **1 Clean FLAIR** - the reference.
+- **2 Degraded FLAIR, SNR 8, r 0.5** - the worst of the 13 conditions,
+  generated with the parity-verified `degrade_slice.m`, on the same 192 x 192
+  crop and with the same noise calibration (sigma = mean brain intensity / 8)
+  as the Python pipeline. The noise realisation is MATLAB's (seed 42): the
+  Python test noise comes from a SHA256-seeded PyTorch generator that MATLAB
+  cannot replay, so the pattern differs while the statistics are identical.
+- **3 Ground truth** outlines on the clean image.
+- **4 Prediction** - placeholder until Stage 3; flip `USE_PREDICTIONS` to
+  true once all predictions exist.
+- **5a/b Low and high band of the degraded input** at D0 = 0.20, computed the
+  way the network sees it: degrade raw intensities, z-score inside the
+  brain, then split (`python/data/dataset.py:181-192`, then the model's
+  `FrequencyBandDecomposition`).
+- **5c High band of the clean input** - added for comparison; it makes the
+  whole rationale of the study visible (below).
+
+**Case 2, typical HGG:**
+
+![Diagnostic case 2](../figures/diagnostic_2_BraTS20_Training_167.png)
+
+**Case 5, LGG without enhancing tumor:**
+
+![Diagnostic case 5](../figures/diagnostic_5_BraTS20_Training_281.png)
+
+### What the panels show
+
+1. **The study's premise, in one picture (5b vs 5c).** In the clean image
+   the high band holds real anatomy: tissue edges, ventricles, sulci. At
+   SNR 8 the high band is almost pure noise, while the low band (5a) still
+   carries the tumor clearly. That is why a model that treats the two bands
+   separately *could* help.
+2. **...and the reason it may not matter here (panel 2).** Even at the worst
+   condition the tumor is obvious to the eye. This is the visual side of
+   critical finding C2: the degradation is mild enough that a normal U-Net
+   barely loses accuracy, which leaves little room for a robustness gain.
+3. **The noise level is what the paper says it is.** Measuring SNR directly
+   in each degraded slice (brain mean / noise sigma estimated from the
+   background, which follows a Rayleigh distribution:
+   sigma = mean(background) / sqrt(pi/2)) gives 8.1-8.5 for four cases and
+   9.8 for case 1. The nominal value is 8; case 1 is higher because its
+   slice is brighter than the whole-volume brain mean that sets the noise.
+   This is an independent end-to-end check of the degradation physics.
+4. **Case 5 shows why "no ET" matters for metrics.** There is no enhancing
+   tumor to find, so any ET a model predicts is a pure false positive and ET
+   Dice is 0 or undefined. The Python metrics need an explicit convention for
+   this (see the Stage 3 checklist).
+
+Other cases: `figures/diagnostic_1_BraTS20_Training_008.png`,
+`_3_..._236.png`, `_4_..._292.png`.
+
+---
+
 ## Corrections log
 
 Anything reported earlier that turned out wrong, so nothing silently changes.
@@ -594,3 +681,6 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `matlab/render3d_demo.m` | Step 1.3 demo with known-answer checks |
 | `results/render3d_surface_error.csv` | surface error per demo case |
 | `figures/render3d_*.png` | 3D renders (self, dilate2, erode2, shift2, blobs) |
+| `matlab/diagnostic_report.m` | Step 1.4 selection rule + per-patient report |
+| `results/diagnostic_selection.csv` | the 5 selected patients and why |
+| `figures/diagnostic_<n>_<id>.png` | the 5 reports |
