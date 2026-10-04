@@ -13,15 +13,17 @@
 % (source, condition, patient, region); see tumor_biomarkers.m for columns.
 
 %% ---- Configuration (paths relative to repo root) ----
+% SOURCE, PRED_DIR, MODELS and OUT_CSV can be pre-set in the workspace before
+% run() (used by test_stage3_pipeline.m); otherwise these defaults apply.
 cd(fileparts(fileparts(mfilename('fullpath'))));
-SOURCE     = 'gt';
+if ~exist('SOURCE', 'var'),   SOURCE   = 'gt'; end
 DATA_ROOT  = 'archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData';
 SPLIT_FILE = 'data/splits/split_v1.json';
-PRED_DIR   = 'results/predictions';
-MODELS     = {'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7'};
+if ~exist('PRED_DIR', 'var'), PRED_DIR = 'results/predictions'; end
+if ~exist('MODELS', 'var'),   MODELS   = {'M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7'}; end
 % python/evaluate.py saves NIfTI predictions for these 3 conditions only.
 CONDITIONS = {'clean', 'snr12_r0.75', 'snr8_r0.5'};
-OUT_CSV    = sprintf('results/volumetrics_%s.csv', SOURCE);
+if ~exist('OUT_CSV', 'var'),  OUT_CSV  = sprintf('results/volumetrics_%s.csv', SOURCE); end
 
 addpath('matlab');
 

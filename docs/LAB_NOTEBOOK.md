@@ -53,6 +53,20 @@ They change what the paper can claim, so they should be raised with the
 Python-side teammate **before** M5-M7 training and evaluation finish. Each
 one has the evidence (file and line) so it can be checked independently.
 
+**At a glance** (severity = effect on what the paper can claim):
+
+| # | Finding | Severity | Suggested action |
+|---|---|---|---|
+| C1 | M2 = M1, M3 = M5, M7 = M4 in code | high | implement as described or drop; M3 already *is* M5 (no need to train M5), M7 training is redundant as is |
+| C2 | worst degradation costs a clean-trained U-Net ~0.006 Dice | high | widen the degradation range, or frame as a negative result |
+| C3 | M4 trains with augmentation, M0 without | medium | add M4 vs M1 comparison (architecture effect alone) |
+| C4 | noise added after k-space truncation fills removed frequencies | medium | add noise before truncation, or a Limitations sentence |
+| C5 | D0 / NLM "tuning" evidence is noise | low-medium | call D0 = 0.20 a design choice |
+| C6 | trained on tumor slices only, tested on all slices | medium | watch fragmentation metrics in Stage 3 |
+| C7 | one seed, 5 epochs (config says 3 seeds, 20) | high for H2 | >= 3 seeds for M0, M1, M4 |
+| C8 | spectral "findings" hard-coded; "< 0 dB" claim false | medium | use measured values (PAPER_DRAFT 2.6) |
+| C9 | HD95 = 373 mm penalty when both masks empty | medium | return 0 when both empty; report median HD95 |
+
 ### C1. Three model pairs are identical in code
 
 The README describes eight different models. In `python/models/factory.py`
@@ -229,6 +243,31 @@ The three tumor regions everything refers to:
 
 Python predictions store ET as label **3** instead of 4. All MATLAB code
 accepts both.
+
+### The physics on one real slice
+
+![Pipeline physics](../figures/pipeline_physics.png)
+
+`matlab/figure_pipeline_physics.m` (candidate paper Figure 1). How to read it:
+
+- **Top row** is what you would see; **bottom row** is the same image as
+  "k-space" (its 2D Fourier transform, log power). In k-space the centre
+  holds the slow, smooth variations and the edges hold fine detail; an MRI
+  scanner actually measures k-space, which is why the degradation is
+  simulated there.
+- **1 -> 2 (resolution loss):** everything outside the white dashed box
+  (r = 0.5 = the central half along each axis) is set to zero. Fine detail is
+  gone; the image blurs.
+- **2 -> 3 (noise):** random complex noise is added and the magnitude taken.
+  In k-space the noise is flat: it **refills the area outside the box** that
+  the truncation had just emptied. A real low-resolution acquisition would
+  have nothing there. That is critical finding C4, visible directly.
+- **3 -> 4:** z-scoring inside the brain (what the network actually gets).
+  Visually identical; only the intensity scale changes.
+- **4 -> 5, 6 (band split):** the red circle is D0 = 0.20. The low band (5)
+  keeps the centre of k-space smoothly (Gaussian, so no hard edge and no
+  ringing): smooth contrast and the tumor's shape. The high band (6) is
+  everything else: edges, plus most of the noise.
 
 ---
 
@@ -747,9 +786,47 @@ Only when the teammate confirms **all** of `results/predictions/` is written
 6. Empty-ET conventions: Python Dice already follows BraTS (1 if both
    empty, 0 if one is). Python HD95 does not (C9): fix before final
    evaluation, or report median HD95.
-7. The other 10 conditions have no NIfTI predictions; their volumes are in
+7. `matlab/agreement_report.m` -> `results/agreement_stage3.csv` and
+   `figures/agreement_stage3_{volume_error,bland_altman}.png` (per model x
+   condition x region: volume bias with CI, limits of agreement, % error,
+   ICC(A,1) with CI, ICC(C,1), sphericity bias, extra pieces vs truth, count
+   of patients with a falsely predicted / completely missed region).
+8. The other 10 conditions have no NIfTI predictions; their volumes are in
    `results/raw_metrics.csv` (`vol_pred_*_cm3`), enough for volume agreement
    but not for shape or fragmentation.
+
+### Dry run of the whole Stage 3 pipeline (done tonight)
+
+So that Stage 3 is "press run" rather than "start debugging",
+`matlab/test_stage3_pipeline.m` builds a **fake** predictions folder in the
+exact format `python/evaluate.py` writes (`<model>_<patient>_<condition>.nii.gz`,
+ET stored as label 3), from ground truth damaged in known ways:
+
+| Fake model | clean | snr12_r0.75 | snr8_r0.5 |
+|---|---|---|---|
+| "M0" | dilate 1 mm | dilate 2 mm | dilate 2 mm + 3 blobs |
+| "M4" | perfect | erode 1 mm | erode 1 mm |
+
+and runs `volumetrics.m` (pred mode) then `agreement_report.m` on it.
+Results (all in a temp folder, deleted after; never touches
+`results/predictions/`):
+
+- `volumetrics.m` **refused** the folder with one file hidden ("1 of 444
+  input files missing ... Not running on a partial set").
+- With the full folder, the report reproduced the Step 1.2 validation biases
+  **exactly** for every region (fake M0 clean = dilate 1 mm, fake M4 SNR 8 =
+  erode 1 mm, fake M4 clean = bias 0 and ICC 1), and flagged the extra blob
+  components.
+- One bug found and fixed in the test harness itself: MATLAB's `niftiwrite`
+  treats the `.5` in `snr8_r0.5` as a file extension and writes
+  `..._r0.nii.gz` unless `.nii` is given explicitly. (Python writes the real
+  files, so the real pipeline is unaffected, but any MATLAB code that writes
+  per-condition NIfTIs must add `.nii`.)
+
+What the Stage 3 volume-error figure will look like (FAKE data, for layout
+only; stored in `docs/dryrun/`, deliberately not in `figures/`):
+
+![Dry run volume error](dryrun/agreement_dryrun_volume_error.png)
 
 ---
 
@@ -798,3 +875,8 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `results/spectral_check.csv` | per patient x modality x condition band SNR |
 | `figures/spectral_band_snr.png` | band SNR figure |
 | `docs/PAPER_DRAFT.md` | Introduction + Methods draft |
+| `matlab/figure_pipeline_physics.m` | physics explainer figure (candidate Figure 1) |
+| `figures/pipeline_physics.png` | the explainer figure |
+| `matlab/agreement_report.m` | Stage 3 agreement analysis (ready to run) |
+| `matlab/test_stage3_pipeline.m` | end-to-end Stage 3 dry run on fake predictions |
+| `docs/dryrun/*.png` | dry-run figures (FAKE data, layout check only) |
