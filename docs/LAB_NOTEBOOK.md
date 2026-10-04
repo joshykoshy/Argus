@@ -176,6 +176,17 @@ from the data, and the script uses unseeded noise. Measured independently
 So `FINDINGS_SPECTRAL.md` should not be cited; `docs/PAPER_DRAFT.md`
 Section 2.6 uses the measured values.
 
+### C9. HD95 penalises a correct "no tumor" prediction
+
+`python/metrics/evaluation.py:38`: `if np.sum(pred_b) == 0 or
+np.sum(target_b) == 0: return 373.13`. When **both** masks are empty (a
+patient with no ET, and a model that correctly predicts none), the function
+returns the maximum penalty instead of 0. The BraTS convention scores this
+case as a perfect match. Five test patients have no ET, so every model's mean
+ET HD95 is inflated by roughly 5/74 x 373 = ~25 mm even if it is perfect on
+them. One-line fix: return 0.0 when both are empty. (Dice handles this case
+correctly: 1.0 when both empty.) Until fixed, report median HD95, not mean.
+
 ### Checked and fine
 
 - **Crop:** the Python 192 x 192 in-plane crop loses 18 tumor voxels in total
@@ -733,9 +744,9 @@ Only when the teammate confirms **all** of `results/predictions/` is written
    Also report sphericity agreement and extra components vs truth.
 4. `matlab/diagnostic_report.m` with `USE_PREDICTIONS = true` (panel 4).
 5. `render_tumor_3d` for M0 vs M4 at `snr8_r0.5` on the 5 selected patients.
-6. Conventions to agree with the teammate for Dice on empty ET (case 5
-   type patients): BraTS convention is Dice = 1 if both empty, 0 if only one
-   is empty. Check `python/metrics/evaluation.py` uses the same.
+6. Empty-ET conventions: Python Dice already follows BraTS (1 if both
+   empty, 0 if one is). Python HD95 does not (C9): fix before final
+   evaluation, or report median HD95.
 7. The other 10 conditions have no NIfTI predictions; their volumes are in
    `results/raw_metrics.csv` (`vol_pred_*_cm3`), enough for volume agreement
    but not for shape or fragmentation.

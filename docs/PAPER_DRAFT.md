@@ -329,7 +329,10 @@ _281 (`results/diagnostic_selection.csv`).
 
 Per-patient paired comparisons use the Wilcoxon signed-rank test with Holm
 correction across comparisons [CITE: Wilcoxon 1945; Holm 1979]. Segmentation
-metrics: Dice per region and 95th-percentile Hausdorff distance (mm).
+metrics: Dice per region and 95th-percentile Hausdorff distance (mm); when
+the reference region is empty, Dice is 1 for an empty prediction and 0
+otherwise. `[TEAM: C9 - HD95 currently returns the 373.13 mm penalty even
+when both masks are empty; BraTS scores that case 0.]`
 
 `[TEAM: C3 - M4 is trained with degradation augmentation, M0 without. A
 robustness gain of M4 over M0 confounds architecture with training data;
