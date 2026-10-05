@@ -188,7 +188,7 @@ Visual check of what SNR 8, r = 0.5 looks like: see Step 1.4.
 
 `python/train.py:159-163`: M0 trains on clean data; **M1-M7 all train with
 uniform random sampling over the 13 conditions**. So M4's weak degraded
-validation score (CLAUDE.md open issue) is not explained by "M4 never saw
+validation score (open issue in the study plan) is not explained by "M4 never saw
 degraded data". The fair robustness comparison for M4 is M1 (same training
 data, different architecture), not M0.
 
@@ -272,7 +272,7 @@ correctly: 1.0 when both empty.) Until fixed, report median HD95, not mean.
 
 `python/analysis/stats.py` (team/master 5bf4fd4):
 
-| | Plan (CLAUDE.md) / PAPER_DRAFT | `stats.py` |
+| | Study plan / PAPER_DRAFT | `stats.py` |
 |---|---|---|
 | H1 | M4 beats M0 by >= 0.05 mean Dice at SNR 8 | M0 drops by > 0.15 |
 | H2 | M4's clean-to-SNR8 drop smaller than M0's (paired Wilcoxon) | M1 recovers > 0.10 over M0, no test |
