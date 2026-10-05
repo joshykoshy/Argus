@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from python.data.dataset import BraTS2DSliceDataset, reconstruct_3d_volume
+from python.data.dataset import reconstruct_3d_volume
 from python.physics.degradation import LowFieldDegradation, DEGRADATION_CONDITIONS
 from python.models.factory import build_model
 from python.metrics.evaluation import evaluate_patient_3d
@@ -36,36 +36,33 @@ def evaluate_patient_volume(
     model: nn.Module,
     patient_id: str,
     condition_id: str,
-    cache_dir: str,
+    patient_dict: Dict,
     deg_module: LowFieldDegradation,
-    device: torch.device = torch.device("cpu")
+    device: torch.device = torch.device("cpu"),
+    batch_size: int = 32
 ) -> Tuple[Dict[str, float], np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Evaluates a single patient volume under a specific degradation condition.
-    Returns computed 3D metrics dictionary, 3D binary predictions (3, 240, 240, 155),
-    3D binary ground truth (3, 240, 240, 155), affine matrix, and zooms.
+    Uses batched slice inference for fast evaluation.
     """
-    npz_path = Path(cache_dir) / f"{patient_id}.npz"
-    data = np.load(npz_path)
-
-    modalities = data["modalities"] # (4, 192, 192, 155) float16
-    seg = data["seg"]               # (192, 192, 155) uint8
-    brain_mask = data["brain_mask"] # (192, 192, 155) uint8
-    mu_brain = data["mu_brain"]     # (4,) float32
-    affine = data["affine"]
-    zooms = tuple(float(z) for z in data["zooms"])
-    crop_coords = tuple(data["crop_coords"])
-    orig_shape = tuple(data["orig_shape"])
-    grade = str(data["grade"])
+    modalities = patient_dict["modalities"] # (4, 192, 192, 155) float16
+    seg = patient_dict["seg"]               # (192, 192, 155) uint8
+    brain_mask = patient_dict["brain_mask"] # (192, 192, 155) uint8
+    mu_brain = patient_dict["mu_brain"]     # (4,) float32
+    affine = patient_dict["affine"]
+    zooms = tuple(float(z) for z in patient_dict["zooms"])
+    crop_coords = tuple(patient_dict["crop_coords"])
+    orig_shape = tuple(patient_dict["orig_shape"])
+    grade = str(patient_dict["grade"])
 
     num_slices = modalities.shape[3] # 155
-    slice_preds = []
+    mu_b = torch.from_numpy(mu_brain)
 
-    # Process slice by slice
+    # Pre-process all slices
+    all_norm_slices = []
     for z in range(num_slices):
         x_2d = torch.from_numpy(modalities[:, :, :, z].astype(np.float32)) # (4, 192, 192)
         m_2d = torch.from_numpy(brain_mask[:, :, :, z].astype(np.float32)) if brain_mask.ndim == 4 else torch.from_numpy(brain_mask[:, :, z].astype(np.float32))
-        mu_b = torch.from_numpy(mu_brain)
 
         # Apply deterministic degradation
         x_deg, _ = deg_module(
@@ -86,14 +83,21 @@ def evaluate_patient_volume(
                 x_norm[c] = (ch - mean_v) / std_v
             else:
                 x_norm[c] = ch
+        all_norm_slices.append(x_norm)
 
-        # Inference
-        with torch.no_grad():
-            inp = x_norm.unsqueeze(0).to(device)
-            p = model(inp).squeeze(0).cpu().numpy() # (3, 192, 192)
-            slice_preds.append(p)
+    # Stack into tensor: (155, 4, 192, 192)
+    x_all = torch.stack(all_norm_slices, dim=0)
 
-    slice_preds_np = np.stack(slice_preds, axis=0) # (155, 3, 192, 192)
+    # Batched forward pass
+    slice_preds = []
+    with torch.no_grad():
+        for start_idx in range(0, num_slices, batch_size):
+            end_idx = min(start_idx + batch_size, num_slices)
+            batch = x_all[start_idx:end_idx].to(device)
+            out = model(batch).cpu().numpy() # (B, 3, 192, 192)
+            slice_preds.append(out)
+
+    slice_preds_np = np.concatenate(slice_preds, axis=0) # (155, 3, 192, 192)
 
     # Reconstruct full 3D prediction volume: (3, 240, 240, 155)
     pred_3d_prob = reconstruct_3d_volume(slice_preds_np, crop_coords=crop_coords, orig_shape=orig_shape)
@@ -104,8 +108,7 @@ def evaluate_patient_volume(
     gt_crop_tc = ((seg == 1) | (seg == 3)).astype(np.float32)
     gt_crop_et = (seg == 3).astype(np.float32)
     gt_crop_3d = np.stack([gt_crop_wt, gt_crop_tc, gt_crop_et], axis=0) # (3, 192, 192, 155)
-    
-    # Reconstruct full GT volume
+
     gt_3d = np.zeros((3, orig_shape[0], orig_shape[1], orig_shape[2]), dtype=np.float32)
     r_s, r_e, c_s, c_e = crop_coords
     gt_3d[:, r_s:r_e, c_s:c_e, :] = gt_crop_3d
@@ -121,7 +124,7 @@ def evaluate_patient_volume(
 
 def run_full_test_evaluation(
     model_ids: List[str] = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7"],
-    seeds: List[int] = [0, 1, 2],
+    seeds: List[int] = [0],
     splits_file: str = "data/splits/split_v1.json",
     cache_dir: str = "data/cache",
     results_dir: str = "results",
@@ -135,12 +138,43 @@ def run_full_test_evaluation(
         splits = json.load(f)
     test_ids = splits["test"]
 
+    print(f"Pre-loading {len(test_ids)} test patients into RAM...")
+    patient_cache = {}
+    for p_id in test_ids:
+        npz_path = Path(cache_dir) / f"{p_id}.npz"
+        data = np.load(npz_path)
+        patient_cache[p_id] = {
+            "modalities": data["modalities"],
+            "seg": data["seg"],
+            "brain_mask": data["brain_mask"],
+            "mu_brain": data["mu_brain"],
+            "affine": data["affine"],
+            "zooms": data["zooms"],
+            "crop_coords": data["crop_coords"],
+            "orig_shape": data["orig_shape"],
+            "grade": data["grade"],
+        }
+
     print(f"Starting Full Test-Set Evaluation on {len(test_ids)} patients across all conditions...")
 
-    all_records = []
     primary_conditions = ["clean", "snr12_r0.75", "snr8_r0.5"]
     nii_save_dir = Path(results_dir) / "predictions"
     nii_save_dir.mkdir(parents=True, exist_ok=True)
+
+    out_csv = Path(results_dir) / "raw_metrics.csv"
+    existing_records = []
+    if out_csv.exists():
+        try:
+            existing_df = pd.read_csv(out_csv)
+            existing_records = existing_df.to_dict("records")
+            print(f"Found existing raw_metrics.csv with {len(existing_records)} records.")
+        except Exception:
+            existing_records = []
+
+    # Map of already evaluated: (model, seed, condition_id, patient_id)
+    evaluated_keys = {(r["model"], r["seed"], r["condition_id"], r["patient_id"]) for r in existing_records}
+
+    all_records = list(existing_records)
 
     for m_id in model_ids:
         for seed in seeds:
@@ -148,6 +182,8 @@ def run_full_test_evaluation(
             if not os.path.exists(ckpt_path):
                 print(f"Skipping {m_id} seed {seed} (checkpoint not found at {ckpt_path})")
                 continue
+            
+            print(f">>> Evaluating Model {m_id} (Seed {seed})...")
             model = load_trained_model(m_id, ckpt_path, device=device, d0=d0)
 
             for cond in DEGRADATION_CONDITIONS:
@@ -155,18 +191,18 @@ def run_full_test_evaluation(
                 snr_val = cond["snr"] if cond["snr"] is not None else 999.0
                 r_val = cond["r"]
 
-                for p_id in tqdm(test_ids, desc=f"Eval {m_id} s{seed} {c_id}", leave=False):
+                cond_new_records = 0
+                for p_id in tqdm(test_ids, desc=f"Eval {m_id} {c_id}", leave=False):
+                    if (m_id, seed, c_id, p_id) in evaluated_keys:
+                        continue
+
+                    p_dict = patient_cache[p_id]
                     metrics, pred_3d_bin, gt_3d, affine, zooms = evaluate_patient_volume(
-                        model, p_id, c_id, cache_dir, deg_module, device=device
+                        model, p_id, c_id, p_dict, deg_module, device=device
                     )
 
                     # Save NIfTI mask for primary conditions on seed 0
                     if seed == 0 and c_id in primary_conditions:
-                        # Combine 3 channels into integer segmentation (1=NCR, 2=ED, 3=ET)
-                        # WT=1,2,3; TC=1,3; ET=3
-                        # NCR = TC & ~ET -> 1
-                        # ET = ET -> 3 (or 4 in BraTS format)
-                        # ED = WT & ~TC -> 2
                         pred_int = np.zeros(pred_3d_bin.shape[1:], dtype=np.uint8)
                         wt_m = pred_3d_bin[0] > 0.5
                         tc_m = pred_3d_bin[1] > 0.5
@@ -177,8 +213,9 @@ def run_full_test_evaluation(
                         pred_int[et_m] = 3 # ET (remapped 3)
 
                         out_nii_path = nii_save_dir / f"{m_id}_{p_id}_{c_id}.nii.gz"
-                        nii_obj = nib.Nifti1Image(pred_int, affine)
-                        nib.save(nii_obj, str(out_nii_path))
+                        if not out_nii_path.exists():
+                            nii_obj = nib.Nifti1Image(pred_int, affine)
+                            nib.save(nii_obj, str(out_nii_path))
 
                     rec = {
                         "model": m_id,
@@ -208,27 +245,36 @@ def run_full_test_evaluation(
                         "edema_core_ratio_abs_err": metrics["edema_core_ratio_abs_err"],
                     }
                     all_records.append(rec)
+                    evaluated_keys.add((m_id, seed, c_id, p_id))
+                    cond_new_records += 1
 
-    # Save Ground Truth NIfTI masks for primary conditions as reference for MATLAB volumetrics
+                # Save checkpoint of raw_metrics after every condition
+                if cond_new_records > 0:
+                    pd.DataFrame(all_records).to_csv(out_csv, index=False)
+
+    # Save Ground Truth NIfTI masks as reference
     gt_nii_dir = nii_save_dir / "ground_truth"
     gt_nii_dir.mkdir(parents=True, exist_ok=True)
     for p_id in test_ids:
-        npz_p = Path(cache_dir) / f"{p_id}.npz"
-        data = np.load(npz_p)
-        seg_cr = data["seg"] # (192, 192, 155)
-        affine = data["affine"]
-        crop_coords = tuple(data["crop_coords"])
-        orig_shape = tuple(data["orig_shape"])
-
-        gt_full = np.zeros(orig_shape, dtype=np.uint8)
-        r_s, r_e, c_s, c_e = crop_coords
-        gt_full[r_s:r_e, c_s:c_e, :] = seg_cr
-
         gt_nii_file = gt_nii_dir / f"GT_{p_id}.nii.gz"
-        nib.save(nib.Nifti1Image(gt_full, affine), str(gt_nii_file))
+        if not gt_nii_file.exists():
+            p_dict = patient_cache[p_id]
+            seg_cr = p_dict["seg"]
+            affine = p_dict["affine"]
+            crop_coords = tuple(p_dict["crop_coords"])
+            orig_shape = tuple(p_dict["orig_shape"])
+
+            gt_full = np.zeros(orig_shape, dtype=np.uint8)
+            r_s, r_e, c_s, c_e = crop_coords
+            gt_full[r_s:r_e, c_s:c_e, :] = seg_cr
+
+            nib.save(nib.Nifti1Image(gt_full, affine), str(gt_nii_file))
 
     raw_metrics_df = pd.DataFrame(all_records)
-    out_csv = Path(results_dir) / "raw_metrics.csv"
     raw_metrics_df.to_csv(out_csv, index=False)
     print(f"Saved {len(raw_metrics_df)} full test evaluation records to {out_csv}")
     return raw_metrics_df
+
+
+if __name__ == "__main__":
+    run_full_test_evaluation()

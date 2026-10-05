@@ -39,7 +39,11 @@ def compute_3d_hd95(pred: np.ndarray, target: np.ndarray, voxelspacing: Tuple[fl
         return 373.13
 
     try:
-        dist = hd95(pred_b, target_b, voxelspacing=voxelspacing)
+        union = pred_b | target_b
+        coords = np.argwhere(union)
+        rmin, cmin, zmin = coords.min(axis=0)
+        rmax, cmax, zmax = coords.max(axis=0) + 1
+        dist = hd95(pred_b[rmin:rmax, cmin:cmax, zmin:zmax], target_b[rmin:rmax, cmin:cmax, zmin:zmax], voxelspacing=voxelspacing)
         return float(dist)
     except Exception:
         return 373.13
