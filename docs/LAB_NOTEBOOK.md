@@ -132,6 +132,7 @@ one has the evidence (file and line) so it can be checked independently.
 | C7 | one seed, 5 epochs (config says 3 seeds, 20) | high for H2 | >= 3 seeds for M0, M1, M4 |
 | C8 | spectral "findings" hard-coded; "< 0 dB" claim false | medium | use measured values (PAPER_DRAFT 2.6) |
 | C9 | HD95 = 373 mm penalty when both masks empty | medium | return 0 when both empty; report median HD95 |
+| C10 | `stats.py` tests different H1-H3 than the plan / paper | high | team fixes one official wording in DECISIONS.md before results |
 
 ### C1. Three model pairs are identical in code
 
@@ -266,6 +267,21 @@ case as a perfect match. Five test patients have no ET, so every model's mean
 ET HD95 is inflated by roughly 5/74 x 373 = ~25 mm even if it is perfect on
 them. One-line fix: return 0.0 when both are empty. (Dice handles this case
 correctly: 1.0 when both empty.) Until fixed, report median HD95, not mean.
+
+### C10. The statistics script tests different hypotheses
+
+`python/analysis/stats.py` (team/master 5bf4fd4):
+
+| | Plan (CLAUDE.md) / PAPER_DRAFT | `stats.py` |
+|---|---|---|
+| H1 | M4 beats M0 by >= 0.05 mean Dice at SNR 8 | M0 drops by > 0.15 |
+| H2 | M4's clean-to-SNR8 drop smaller than M0's (paired Wilcoxon) | M1 recovers > 0.10 over M0, no test |
+| H3 | M5 explains >= 50 % of M4's gain over M6 | M4 significantly beats M1 |
+
+Whichever set the team picks must be written down before results are seen,
+otherwise it looks like the hypotheses were chosen to fit. Given C2, all of
+`stats.py`'s thresholds (0.15, 0.10) will fail too. Assigned: decision to
+Mayank, implementation to Nazir (`docs/handoff/`).
 
 ### Update 2026-10-06: M5-M7 trained, C1 confirmed in the results
 

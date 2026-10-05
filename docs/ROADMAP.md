@@ -53,7 +53,8 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
       what we can claim):
   - [x] Was M4 trained on clean scans only, or with degraded ones like M1?
         -> answered from code: with degradation (see LAB_NOTEBOOK C3)
-  - [ ] Discuss critical findings C1, C2, C4, C5, C7, C8, C9 (LAB_NOTEBOOK.md)
+  - [ ] Discuss critical findings C1, C2, C4, C5, C7, C8, C9, C10 (LAB_NOTEBOOK.md)
+  - [ ] Hand out task briefs: `docs/handoff/TASK_MAYANK.md`, `docs/handoff/TASK_NAZIR.md`
   - [ ] H3 names the wrong comparison model (M6 still uses the split) - fix wording
   - [ ] Can M0-M4 be evaluated now, before M5-M7 finish, to save time?
 
