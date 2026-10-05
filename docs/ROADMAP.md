@@ -46,7 +46,7 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
 
 ## Stage 2 - Teammate finishes the models (team, in parallel with Stage 1)
 - [x] 2.1 M0-M4 trained
-- [ ] 2.2 M5-M7 trained
+- [x] 2.2 M5-M7 trained (2026-10-06; C1 duplicates not fixed, see notebook)
 - [ ] 2.3 3D test evaluation: 8 models x 74 patients x 13 scan conditions
       -> `results/predictions/*.nii.gz` + `results/raw_metrics.csv`
 - [ ] 2.4 Settle the open questions with the teammate (raise early, they shape

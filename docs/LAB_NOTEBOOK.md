@@ -14,8 +14,74 @@ roadmap step.
 
 ---
 
+## Picture tour (start here)
+
+Six pictures that explain the whole project. Details for each are further down.
+
+### 1. What the scans look like, and what "worse scanner" means
+
+![Gallery](../figures/gallery_cases.png)
+
+Each column is one test patient (chosen by a fixed rule, Step 1.4). **Row 1**
+is a normal hospital scan (FLAIR: tumor and swelling show up bright).
+**Row 2** is the same slice made to look like a cheap low-field scanner:
+grainier (noise) and a little blurrier (lower resolution). This is the
+*worst* setting in the study. **Row 3** is the expert's outline of the tumor,
+which is the "right answer" the computer models try to copy. **Row 4** zooms
+in, normal on the left, low-field on the right.
+
+Notice: even in the worst setting the tumor is still easy to see. That is
+why the models barely get worse (critical finding C2).
+
+### 2. How the "worse scanner" is made, and how the image gets split
+
+![Pipeline physics](../figures/pipeline_physics.png)
+
+Top row, left to right: normal scan -> blur it -> add grain -> normalise ->
+split into a **smooth part** (5) and a **detail part** (6). The proposed
+model M4 looks at the smooth and detail parts separately. The idea: noise
+mostly lands in the detail part, so the model can lean on the smooth part.
+Bottom row: the same images as "frequency maps" (what the MRI machine
+actually records); centre = smooth, edges = fine detail.
+
+### 3. One patient, all the panels
+
+![Diagnostic case 2](../figures/diagnostic_2_BraTS20_Training_167.png)
+
+Panel 4 (the model's answer) is empty until predictions exist. Compare 5b
+and 5c: in a clean scan the detail part shows real brain structure; in the
+noisy scan it is mostly grain.
+
+### 4. Testing our measuring tools with deliberately wrong outlines
+
+![Damage examples](../figures/agreement_damage_examples.png)
+
+Before trusting our tools on the models, we fed them outlines that we broke
+on purpose (too big, too small, shifted, a hole, fake extra spots) and
+checked they reported exactly the damage we made. They did (Step 1.2).
+
+### 5. The 3D view: where is a prediction wrong?
+
+![Render shift](../figures/render3d_shift2.png)
+
+Left: the true tumor in 3D inside a see-through brain. Middle: a "prediction"
+(here, the truth shifted by 2 mm on purpose). Right: the prediction's surface
+coloured by error: **red = sticks out too far, blue = falls short, white =
+right on**. With real predictions this shows exactly where each model goes
+wrong.
+
+### 6. Coming next: model vs truth
+
+When the predictions exist, this same layout will show the real models
+(M0 = normal model, M4 = proposed model) side by side with the truth, at
+normal and at worst scan quality. The pipeline is already built and tested
+(Stage 3 dry run, below).
+
+---
+
 ## Contents
 
+- [Picture tour (start here)](#picture-tour-start-here)
 - [Status at a glance](#status-at-a-glance)
 - [Critical findings for the team](#critical-findings-for-the-team) (read this first)
 - [The pipeline in one picture](#the-pipeline-in-one-picture)
@@ -41,7 +107,7 @@ roadmap step.
 | 1.3 | 3D renderer | done |
 | 1.4 | Diagnostic report panels 1, 2, 3, 5 | done (panel 4 waits for predictions) |
 | 1.5 | Paper sections not needing results | done (draft) |
-| 2.x | Teammate: M5-M7, 3D evaluation | waiting on teammate |
+| 2.x | Teammate: M5-M7 trained (done); 3D evaluation (Phase 6) | evaluation not run yet |
 | 3-5 | Real predictions, stats, write-up | blocked on 2.x |
 
 ---
@@ -200,6 +266,30 @@ case as a perfect match. Five test patients have no ET, so every model's mean
 ET HD95 is inflated by roughly 5/74 x 373 = ~25 mm even if it is perfect on
 them. One-line fix: return 0.0 when both are empty. (Dice handles this case
 correctly: 1.0 when both empty.) Until fixed, report median HD95, not mean.
+
+### Update 2026-10-06: M5-M7 trained, C1 confirmed in the results
+
+The teammate pushed M5, M6, M7 checkpoints (`team/master` 5bf4fd4). The
+model code (`python/models/`) is unchanged, so the C1 duplicates were
+trained as duplicates. The logs show it:
+
+| Pair (identical code, same seed) | Epoch-1 train loss | Final clean WT Dice | Final mean Dice, all val conditions |
+|---|---|---|---|
+| M3 vs M5 | 1.48710 vs 1.48686 | 0.859 vs **0.874** | 0.758 vs **0.769** |
+| M4 vs M7 | 1.50330 vs 1.50323 | 0.868 vs **0.859** | 0.720 vs **0.714** |
+| M1 vs M2 | 1.50196 vs 1.50201 | 0.850 vs 0.855 | 0.763 vs 0.764 |
+
+**This is the most useful number the project has produced so far:** the
+same model, trained twice, ends up to **0.015 Dice** apart. That is the
+noise floor for any model comparison here. M0's whole robustness drop at the
+worst condition (0.006) is smaller than it, and H1's 0.05 margin is about
+3x it. Any claimed difference between models below ~0.02 Dice cannot be
+told apart from training randomness without more seeds (C7).
+
+Also in that push: `evaluate.py` now resumes interrupted runs and evaluates
+seed 0 only; HD95 got a speed-up (crop to the bounding box) but still returns
+the 373 mm penalty when both masks are empty (C9 open). No predictions have
+been produced yet.
 
 ### Checked and fine
 
@@ -880,3 +970,5 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `matlab/agreement_report.m` | Stage 3 agreement analysis (ready to run) |
 | `matlab/test_stage3_pipeline.m` | end-to-end Stage 3 dry run on fake predictions |
 | `docs/dryrun/*.png` | dry-run figures (FAKE data, layout check only) |
+| `matlab/figure_gallery.m` | picture-tour gallery of the 5 patients |
+| `figures/gallery_cases.png` | the gallery |
