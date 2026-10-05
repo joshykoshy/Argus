@@ -1,0 +1,9 @@
+model,seed,status,best_val_score,runtime_minutes,checkpoint
+M0,0,already_completed,0.0,0.0,results\M0\seed_0\best_model.pt
+M1,0,already_completed,0.0,0.0,results\M1\seed_0\best_model.pt
+M2,0,already_completed,0.0,0.0,results\M2\seed_0\best_model.pt
+M3,0,already_completed,0.0,0.0,results\M3\seed_0\best_model.pt
+M4,0,already_completed,0.0,0.0,results\M4\seed_0\best_model.pt
+M5,0,already_completed,0.0,0.0,results\M5\seed_0\best_model.pt
+M6,0,success,0.6429569951918178,91.0,results\M6\seed_0\best_model.pt
+M7,0,success,0.7137272374002136,110.9,results\M7\seed_0\best_model.pt
