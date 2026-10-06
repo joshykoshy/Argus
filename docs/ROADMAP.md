@@ -8,6 +8,19 @@ Plus: *do the tumor measurements a doctor would use stay correct?*
 
 ---
 
+## Redesign (2026-10-06, after the professor meeting)
+The degradation is too mild for any model to show a gain (C2), so the training is
+being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
+- [ ] R0 **Pilot, no training:** run the trained checkpoints on the validation
+      patients under a harsher grid (SNR 8/5/3/2, r 1.0/0.5, 5 mm slices, both
+      noise orders) -> pick the range where M0 loses >= 0.10 Dice
+      (`pilot/pilot_colab.ipynb`)
+- [ ] R1 Fix the noise order (C4) and write the new range + H1-H3 into
+      `docs/DECISIONS.md` BEFORE training
+- [ ] R2 Train M0, M1, M4, M5, M6 x 3 seeds, all tumor slices + some tumor-free,
+      30-50 epochs, on Colab
+- [ ] R3 Evaluate on the 74 test patients -> Stage 3 (MATLAB) + Stage 4 (stats)
+
 ## Stage 0 - Setup (done)
 - [x] 0.1 Fork repo, remotes (`origin` = yours, `team` = shared), branch `matlab-analysis`
 - [x] 0.2 Dataset extracted to `archive/`, kept out of git

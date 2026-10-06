@@ -936,6 +936,37 @@ only; stored in `docs/dryrun/`, deliberately not in `figures/`):
 
 ---
 
+## Redesign: the degradation pilot (2026-10-06)
+
+**Why:** after the professor meeting the plan is to redo training so the study
+can actually detect a difference (C2). Before retraining, the new degradation
+range has to be chosen from evidence, not guessed.
+
+**What:** `pilot/pilot.py` runs the five distinct trained checkpoints (M0, M1,
+M4, M5, M6; seed 0) on the 37 validation patients under 36 conditions and
+records Dice per model, patient and condition. `pilot/analyze.py` turns that
+into a Dice-vs-SNR figure and a table sorted by how much M0 loses.
+`pilot/pilot_colab.ipynb` runs both on a Colab GPU, resumable on disconnect.
+
+| Factor | Levels | Why |
+|---|---|---|
+| SNR (linear) | 8, 5, 3, 2 + noise-free | extend below today's worst (8) |
+| in-plane r | 1.0, 0.5 | resolution loss |
+| slice thickness | 1, 5 mm (moving average of 5 slices along z) | real low-field scans have thick slices; today's simulation is in-plane only |
+| noise order | `image` (current) and `kspace` (noise only in acquired k-space, rescaled so per-pixel sigma = mu / SNR) | measures how much the C4 physics fix matters |
+
+**Built-in checks** (run before every pilot): the `image` order reproduces the
+team's `apply_degradation_single_slice` to < 1e-4 given the same noise; the
+`kspace` order gives the intended noise sigma on a blank image (within 3 %);
+no degradation returns the input unchanged. The same noise realisation is used
+for every model at a given patient and condition, so comparisons are paired.
+The test set is not touched.
+
+**Decision rule:** the new training range is the set of conditions where the
+clean-trained M0 loses >= 0.10 mean Dice (the old worst lost 0.006).
+
+---
+
 ## Corrections log
 
 Anything reported earlier that turned out wrong, so nothing silently changes.
