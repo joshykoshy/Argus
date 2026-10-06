@@ -54,9 +54,9 @@ answers* (ground truth). When predictions arrive, we just swap the input folder.
   - [x] Was M4 trained on clean scans only, or with degraded ones like M1?
         -> answered from code: with degradation (see LAB_NOTEBOOK C3)
   - [ ] Discuss critical findings C1, C2, C4, C5, C7, C8, C9, C10 (LAB_NOTEBOOK.md)
-  - [ ] Hand out task briefs: `docs/handoff/TASK_MAYANK.md`, `docs/handoff/TASK_NAZIR.md`
+  - [x] Hand out task briefs: `docs/handoff/TASK_MAYANK.md`, `docs/handoff/TASK_NAZIR.md`
   - [ ] H3 names the wrong comparison model (M6 still uses the split) - fix wording
-  - [ ] Can M0-M4 be evaluated now, before M5-M7 finish, to save time?
+  - [x] ~~Can M0-M4 be evaluated now?~~ moot: all 8 trained
 
 Gate: do not start Stage 3 until **all** predictions are written (a half-full
 folder would mix models).
@@ -75,7 +75,13 @@ folder would mix models).
 - [ ] 3.4 Diagnostic report panel 4 (prediction overlay) for the 5 patients
 - [ ] 3.5 3D comparisons M0 vs M4 with error heatmaps
 
-## Stage 4 - Statistics and verdicts (team runs `python/analysis/stats.py`; you check)
+## Stage 4 - Statistics and verdicts (Nazir; you check)
+- [x] 4.0 Statistics pipeline rebuilt to match the paper's H1-H3 (Nazir, 2026-10-06):
+      seed-averaged per-patient paired Wilcoxon, Holm correction, bootstrap 95% CIs
+      (seed 42), verdict per hypothesis = supported / not supported / inconclusive,
+      seed-noise flag (~0.015 Dice), M4 vs M1 always reported, median HD95,
+      duplicates M2/M3/M7 skipped. Validated on fake data with planted effects
+      and a null case. Waiting for the real `results/raw_metrics.csv`.
 - [ ] 4.1 **H1**: does M4 beat M0 by >= 0.05 Dice at SNR=8?
 - [ ] 4.2 **H2**: does M4 lose significantly less Dice from clean to SNR=8 than M0?
       (Wilcoxon test, Holm correction for multiple tests)
@@ -86,7 +92,15 @@ Each verdict can be "supported", "not supported", or "mixed". All three are
 publishable if reported honestly; early validation data hints M4 may *not* be
 more robust, so plan for that.
 
+## Interactive 3D viewer (Nazir)
+- [x] Plotly HTML viewer: WT/TC/ET meshes (marching cubes, sigma 0.5, mm units),
+      truth vs prediction with signed-distance colouring. Validated on damaged
+      masks: dilate 2 mm -> +2.04, erode 2 mm -> -2.05 mm, matching the MATLAB
+      renderer within 0.1 mm.
+- [ ] M0 vs M4 viewers for the 5 example patients (needs predictions)
+
 ## Stage 5 - Finish the paper
+- [ ] 5.0 Literature: verify every reference, write Related Work (Nazir, pending)
 - [ ] 5.1 Results section (numbers from Stages 3-4)
 - [ ] 5.2 Discussion (what it means, limitations, why M4 did/didn't help)
 - [ ] 5.3 Abstract and conclusion (written last)
