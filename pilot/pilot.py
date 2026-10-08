@@ -184,6 +184,9 @@ def main():
     ap.add_argument("--splits", default="data/splits/split_v1.json")
     ap.add_argument("--max_patients", type=int, default=0, help="0 = all validation patients")
     ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--models", default=",".join(MODELS), help="comma-separated model ids")
+    ap.add_argument("--ckpt_root", default="results",
+                    help="checkpoints at <root>/<model>/seed_0/best_model.pt (v1: results; v2: the train_v2 folder)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -197,11 +200,11 @@ def main():
     grade = dict(zip(mapping["BraTS_2020_subject_ID"], mapping["Grade"]))
 
     models = {}
-    for m in MODELS:
+    for m in args.models.split(","):
         net = build_model(m, d0=0.20).to(device)
         # weights_only=False: the team's checkpoints store more than tensors, which
         # PyTorch >= 2.6 refuses to unpickle by default. They are our own files.
-        ckpt = torch.load(f"results/{m}/seed_0/best_model.pt", map_location=device, weights_only=False)
+        ckpt = torch.load(f"{args.ckpt_root}/{m}/seed_0/best_model.pt", map_location=device, weights_only=False)
         net.load_state_dict(ckpt["model_state_dict"])
         models[m] = net.eval()
 

@@ -1004,6 +1004,20 @@ cm^3), uses batch-level soft Dice + BCE, 30 epochs, mixed precision, and
 checkpoints to Drive every epoch (resumable). `training/train_colab.ipynb`
 runs it. Success = 3D Dice well above 0.2 and false tumor near 0 cm^3.
 
+**Result (2026-10-08, Colab L4, seed 0, 30 epochs, ~70 s per epoch, 36 min):**
+
+| Epoch | 2 | 4 | 6 | 8 | 14 | 20 | 28 (best) | 30 |
+|---|---|---|---|---|---|---|---|---|
+| Validation full-volume 3D Dice | 0.677 | 0.731 | 0.826 | 0.831 | 0.839 | 0.835 | **0.840** | 0.838 |
+| False tumor on tumor-free slices (cm^3) | 5.9 | 2.1 | 0.4 | 0.1 | 0.2 | 0.2 | 0.2 | 0.2 |
+
+Full-volume 3D Dice went from 0.21 (v1 M0) to 0.84, and false tumor from ~450
+cm^3 to 0.2 cm^3: the fix works. Dice plateaus by epoch 6-8, so 15-20 epochs
+is enough for the remaining runs. Caveat: the best epoch is chosen on the same
+validation patients that report the score (slightly optimistic); the 74 test
+patients remain untouched for the final numbers. Checkpoint:
+`MyDrive/Argus/train_v2/M0/seed_0/best_model.pt` (not in git, 17 MB).
+
 ---
 
 ## Corrections log
