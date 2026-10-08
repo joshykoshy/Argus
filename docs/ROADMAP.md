@@ -23,11 +23,13 @@ being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
 - [x] RB **Step B:** rerun the pilot with the new M0 -> M0 loses 0.17 Dice at SNR 8
       already (C2 withdrawn); proposed range = DEC-005 (kspace noise, SNR 8/5/3 x r x thickness)
 - [ ] Tell Mayank about C11 before he runs the Phase 6 evaluation
-- [ ] R1 Fix the noise order (C4) and write the new range + H1-H3 into
-      `docs/DECISIONS.md` BEFORE training
-- [ ] R2 Train M0, M1, M4, M5, M6 x 3 seeds, all tumor slices + some tumor-free,
-      30-50 epochs, on Colab
-- [ ] R3 Evaluate on the 74 test patients -> Stage 3 (MATLAB) + Stage 4 (stats)
+- [x] R1 Noise order fixed (k-space noise, C4) and the range + H1-H3 written into
+      `docs/DECISIONS.md` before training: DEC-005 (range), DEC-006 (hypotheses,
+      headline = M4 vs M1), DEC-007 (protocol)
+- [ ] R2 **Step C:** train M0, M1, M4, M5, M6 x seeds 0-2 (15 runs, 20 epochs,
+      DEC-007) on Colab: `training/train_colab.ipynb` -> `MyDrive/Argus/train_v3/`
+- [ ] R3 **Step D:** evaluate on the 74 test patients (13 conditions, Dice + HD95 +
+      NIfTI predictions) -> Stage 3 (MATLAB) + Stage 4 (stats, DEC-006)
 
 ## Stage 0 - Setup (done)
 - [x] 0.1 Fork repo, remotes (`origin` = yours, `team` = shared), branch `matlab-analysis`

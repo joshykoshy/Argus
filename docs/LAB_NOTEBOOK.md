@@ -1050,6 +1050,23 @@ agreement before training): `kspace` noise; clean + SNR {8, 5, 3} x r {1.0, 0.5}
 x slice {1, 5 mm} = 13 conditions; worst = SNR 3, r 0.5, 5 mm (M0 v2 drop
 0.34). SNR 2 excluded (half the accuracy gone; closer to an unusable scan).
 
+### Step C: the real training (set up 2026-10-08)
+
+The range, the hypotheses and the protocol were written into
+`docs/DECISIONS.md` before any model was trained on them (DEC-005, DEC-006,
+DEC-007), so the comparison cannot have been tuned to the result. Headline
+question (H1): at the worst condition, does M4 beat M1? Both see the same
+degraded training data, so the difference is the architecture alone.
+
+`training/train_v2.py` now trains every model under one protocol: M0 clean;
+M1/M4/M5/M6 draw one of the 13 DEC-005 conditions per slice (a 5 mm slice =
+mean of 5 neighbouring slices, then in-plane k-space truncation and k-space
+noise via the pilot's verified `degrade_volume`). Validation = full-volume 3D
+Dice under clean, SNR 5 and the worst condition, with the noise seeded per
+patient and condition so every model and epoch sees identical volumes; the
+best epoch is the one with the highest mean of the three. 5 models x 3 seeds =
+15 runs (`training/train_colab.ipynb`, outputs in `MyDrive/Argus/train_v3/`).
+
 ---
 
 ## Corrections log
