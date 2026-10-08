@@ -133,6 +133,7 @@ one has the evidence (file and line) so it can be checked independently.
 | C8 | spectral "findings" hard-coded; "< 0 dB" claim false | medium | use measured values (PAPER_DRAFT 2.6) |
 | C9 | HD95 = 373 mm penalty when both masks empty | medium | return 0 when both empty; report median HD95 |
 | C10 | `stats.py` tests different H1-H3 than the plan / paper | high | team fixes one official wording in DECISIONS.md before results |
+| C11 | v1 models draw tumor on 100 % of tumor-free slices: true 3D Dice ~0.2, not ~0.75 | **critical** | retrain on all brain slices with full-3D validation (redesign Step A) |
 
 ### C1. Three model pairs are identical in code
 
@@ -267,6 +268,31 @@ case as a perfect match. Five test patients have no ET, so every model's mean
 ET HD95 is inflated by roughly 5/74 x 373 = ~25 mm even if it is perfect on
 them. One-line fix: return 0.0 when both are empty. (Dice handles this case
 correctly: 1.0 when both empty.) Until fixed, report median HD95, not mean.
+
+### C11. The trained models only work on tumor slices (full-volume Dice ~0.2)
+
+Found by the degradation pilot and confirmed by `pilot/diagnose.py` (10
+validation patients, clean scans, the same predictions scored three ways):
+
+| Score | M0 | M4 |
+|---|---|---|
+| training's metric: 8 largest-tumor slices, per slice | 0.755 | 0.719 |
+| full-volume 3D Dice (what the paper evaluates) | **0.21** | **0.18** |
+| 3D Dice on tumor-bearing slices only | 0.46 | 0.53 |
+| tumor-free slices with false tumor | **100 %** | **100 %** |
+| false tumor on tumor-free slices, mean | ~450 cm^3 | ~360 cm^3 |
+| true whole tumor, range | 32-176 cm^3 | |
+
+The training metric reproduces the logs (0.755 vs the reported ~0.75), so the
+pilot pipeline is correct. The models were trained on the 10 largest-tumor
+slices per patient (DEV-003) and validated on the 8 largest (dataset.py,
+`max_slices_per_patient = 8` for val), so a model that marks tumor everywhere
+was never penalised. On a full volume they mark tumor on every tumor-free
+slice, 4-10x the real tumor volume. Consequences: the planned Phase 6
+evaluation would return ~0.2 Dice for every model; the degradation pilot's
+numbers are dominated by false positives and cannot choose a range; C6 is
+confirmed. Fix (redesign Step A, `training/train_v2.py`): train on all brain
+slices, validate on full volumes, report false-tumor volume.
 
 ### C10. The statistics script tests different hypotheses
 
@@ -964,6 +990,19 @@ The test set is not touched.
 
 **Decision rule:** the new training range is the set of conditions where the
 clean-trained M0 loses >= 0.10 mean Dice (the old worst lost 0.006).
+
+**Outcome of the first run (2026-10-07):** unusable for choosing the range.
+Clean full-volume Dice was ~0.2 for every model, which led to finding C11.
+The pilot will be rerun with the retrained M0 (Step B).
+
+### Step A: retrain M0 properly
+
+`training/prepare.py` converts each patient once into memory-mappable slice
+arrays (same team preprocessing); `training/train_v2.py` trains on every brain
+slice (tumor-free included), validates on full volumes (3D Dice + false-tumor
+cm^3), uses batch-level soft Dice + BCE, 30 epochs, mixed precision, and
+checkpoints to Drive every epoch (resumable). `training/train_colab.ipynb`
+runs it. Success = 3D Dice well above 0.2 and false tumor near 0 cm^3.
 
 ---
 

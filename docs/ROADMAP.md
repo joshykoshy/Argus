@@ -15,6 +15,13 @@ being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
       patients under a harsher grid (SNR 8/5/3/2, r 1.0/0.5, 5 mm slices, both
       noise orders) -> pick the range where M0 loses >= 0.10 Dice
       (`pilot/pilot_colab.ipynb`)
+      -> first run done 2026-10-07: clean 3D Dice ~0.2 for every model; the
+         diagnostic showed false tumor on every tumor-free slice (C11), so the
+         range cannot be chosen from the v1 models
+- [ ] RA **Step A:** retrain M0 on all brain slices with full-3D validation
+      (`training/train_colab.ipynb`)
+- [ ] RB **Step B:** rerun the pilot with the new M0 -> choose the range
+- [ ] Tell Mayank about C11 before he runs the Phase 6 evaluation
 - [ ] R1 Fix the noise order (C4) and write the new range + H1-H3 into
       `docs/DECISIONS.md` BEFORE training
 - [ ] R2 Train M0, M1, M4, M5, M6 x 3 seeds, all tumor slices + some tumor-free,
