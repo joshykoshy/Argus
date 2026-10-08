@@ -20,8 +20,8 @@ being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
          range cannot be chosen from the v1 models
 - [x] RA **Step A:** retrain M0 on all brain slices with full-3D validation
       (`training/train_colab.ipynb`) -> 3D Dice 0.84 (v1: 0.21), false tumor 0.2 cm^3 (v1: ~450)
-- [ ] RB **Step B:** rerun the pilot with the new M0 -> choose the range
-      (`pilot/pilot_colab.ipynb`, last two cells)
+- [x] RB **Step B:** rerun the pilot with the new M0 -> M0 loses 0.17 Dice at SNR 8
+      already (C2 withdrawn); proposed range = DEC-005 (kspace noise, SNR 8/5/3 x r x thickness)
 - [ ] Tell Mayank about C11 before he runs the Phase 6 evaluation
 - [ ] R1 Fix the noise order (C4) and write the new range + H1-H3 into
       `docs/DECISIONS.md` BEFORE training

@@ -124,7 +124,7 @@ one has the evidence (file and line) so it can be checked independently.
 | # | Finding | Severity | Suggested action |
 |---|---|---|---|
 | C1 | M2 = M1, M3 = M5, M7 = M4 in code | high | implement as described or drop; M3 already *is* M5 (no need to train M5), M7 training is redundant as is |
-| C2 | worst degradation costs a clean-trained U-Net ~0.006 Dice | high | widen the degradation range, or frame as a negative result |
+| C2 | ~~worst degradation costs a clean-trained U-Net ~0.006 Dice~~ **withdrawn**: artefact of C11; a working M0 loses 0.17 at SNR 8 (Step B) | resolved | range chosen from the Step B pilot (DEC-005, proposed) |
 | C3 | M4 trains with augmentation, M0 without | medium | add M4 vs M1 comparison (architecture effect alone) |
 | C4 | noise added after k-space truncation fills removed frequencies | medium | add noise before truncation, or a Limitations sentence |
 | C5 | D0 / NLM "tuning" evidence is noise | low-medium | call D0 = 0.20 a design choice |
@@ -1018,6 +1018,38 @@ validation patients that report the score (slightly optimistic); the 74 test
 patients remain untouched for the final numbers. Checkpoint:
 `MyDrive/Argus/train_v2/M0/seed_0/best_model.pt` (not in git, 17 MB).
 
+### Step B: pilot with the retrained M0 (2026-10-08)
+
+Same 36 conditions, 37 validation patients, M0 v2 only
+(`MyDrive/Argus/pilot/v2/pilot_summary.csv`). Clean full-volume Dice 0.839.
+Drop from clean, by factor:
+
+| Condition group | M0 Dice | Drop |
+|---|---|---|
+| no noise; r 0.5 and/or 5 mm slices | 0.825-0.836 | 0.003-0.015 |
+| SNR 8 (all r, thickness, noise orders) | 0.634-0.670 | 0.170-0.205 |
+| SNR 5 | 0.595-0.652 | 0.187-0.244 |
+| SNR 3 | 0.498-0.604 | 0.236-0.341 |
+| SNR 2 | 0.335-0.511 | 0.329-0.504 |
+
+Findings:
+1. **C2 was an artefact of C11.** A properly trained clean model loses 0.17
+   Dice already at SNR 8, the old worst condition (v1: 0.006). The v1 number
+   came from models scored on their 8 easiest slices.
+2. Noise drives the damage; resolution and slice thickness alone cost <= 0.015
+   and only add on top of noise.
+3. Noise order matters only when k-space is truncated: at r 0.5 the physically
+   correct `kspace` order is clearly harsher (SNR 2: 0.35 vs 0.51; SNR 3, 5 mm:
+   0.50 vs 0.60). Band-limited noise is spatially correlated (blotches, not
+   grain). At r 1.0 the two orders agree, as they must.
+4. Every noisy condition passes the >= 0.10 rule, so the study now has room to
+   detect a robustness gain.
+
+Proposed range for Step C (DEC-005 in `docs/DECISIONS.md`, needs team
+agreement before training): `kspace` noise; clean + SNR {8, 5, 3} x r {1.0, 0.5}
+x slice {1, 5 mm} = 13 conditions; worst = SNR 3, r 0.5, 5 mm (M0 v2 drop
+0.34). SNR 2 excluded (half the accuracy gone; closer to an unusable scan).
+
 ---
 
 ## Corrections log
@@ -1027,6 +1059,7 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | When | What was said | Correction | Why |
 |---|---|---|---|
 | Step 1.1, first run | Median sphericity WT 0.591, TC 0.781, ET 0.430 | WT 0.554, TC 0.744, ET 0.377 | `regionprops3` multi-piece bug (above); first run under-counted surface area |
+| Critical findings, C2 | "The degradation barely hurts even the clean-trained baseline (0.006 Dice)" | A properly trained clean model loses 0.17 Dice at SNR 8 | The 0.006 came from the v1 models, which were scored on their 8 easiest slices and were broken on full volumes (C11); Step B pilot |
 | Step 0 / 1.1 | "Image Processing Toolbox is all we need" | Statistics Toolbox is also absent | found when `corr` failed; stats are hand-implemented and tested |
 
 ---
