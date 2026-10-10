@@ -28,6 +28,10 @@ being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
       headline = M4 vs M1), DEC-007 (protocol)
 - [ ] R2 **Step C:** train M0, M1, M4, M5, M6 x seeds 0-2 (15 runs, 20 epochs,
       DEC-007) on Colab: `training/train_colab.ipynb` -> `MyDrive/Argus/train_v3/`
+      2026-10-10: Colab GPU quota used up after 4 finished runs (M0, M1, M4, M5 seed 0)
+      + M6 seed 0 at epoch 15; continuing on Kaggle's free GPU with
+      `training/train_kaggle.ipynb`, which restores and resumes the saved runs.
+      Seed-0 validation, worst condition: M0 0.512, M1 0.753, M4 0.753, M5 0.756
 - [ ] R3 **Step D:** evaluate on the 74 test patients (13 conditions, Dice + HD95 +
       NIfTI predictions) -> Stage 3 (MATLAB) + Stage 4 (stats, DEC-006)
 
