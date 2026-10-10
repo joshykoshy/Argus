@@ -1067,6 +1067,34 @@ patient and condition so every model and epoch sees identical volumes; the
 best epoch is the one with the highest mean of the three. 5 models x 3 seeds =
 15 runs (`training/train_colab.ipynb`, outputs in `MyDrive/Argus/train_v3/`).
 
+**Step C result (2026-10-10; Colab T4 for seed 0, Kaggle T4 for the rest;
+validation patients, best epoch per run, full-volume 3D Dice, mean of 3 seeds):**
+
+| Model | Clean | SNR 5 | Worst (SNR 3, r 0.5, 5 mm) | Clean-to-worst drop | Worst, per seed |
+|---|---|---|---|---|---|
+| M0 (clean training) | 0.798 | 0.676 | 0.543 | 0.255 | 0.512 / 0.565 / 0.553 |
+| M1 (U-Net + augmentation) | 0.826 | 0.824 | 0.756 | 0.070 | 0.753 / 0.760 / 0.756 |
+| M4 (dual-stream) | 0.828 | 0.819 | 0.750 | 0.078 | 0.753 / 0.745 / 0.751 |
+| M5 (low band only) | 0.821 | 0.815 | 0.758 | 0.063 | 0.756 / 0.759 / 0.759 |
+| M6 (early fusion) | 0.826 | 0.823 | 0.758 | 0.069 | 0.753 / 0.760 / 0.760 |
+
+False tumor on tumor-free slices 0.2-0.3 cm^3 for every augmented run.
+
+Reading (validation only; the DEC-006 verdicts come from the 74-patient test
+set with paired Wilcoxon + Holm, Step D):
+- Degradation augmentation is the effect: worst-condition Dice 0.543 -> ~0.756
+  (+0.21), identical across the four augmented architectures.
+- H1 (M4 > M1 at worst): M4 - M1 = -0.006, inside seed-to-seed variation
+  (per-seed SD ~0.004): points to not supported.
+- H2 (M4 drop < M1 drop): 0.078 vs 0.070: points to not supported.
+- H3 (M4 > M6 at worst): 0.750 vs 0.758: points to not supported.
+- M5 (low band only) matches the best model, so the high band contributes
+  nothing measurable under this degradation.
+- Caveat for the paper: for M0 seeds 1 and 2 the DEC-007 selection rule (mean of
+  clean, SNR 5 and worst) picked epoch 4, because a clean-trained model gets
+  less robust as it trains longer. Report M0's last-epoch numbers too, as a
+  sensitivity analysis.
+
 ---
 
 ## Corrections log
