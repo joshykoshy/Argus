@@ -260,6 +260,10 @@ def run(args) -> None:
         todo = [c for c in conds if (pid, c["id"]) not in done]
         if not todo:
             continue
+        if args.time_limit_h and (time.time() - t_start) / 3600 > args.time_limit_h:
+            print(f"Stopping at {(time.time() - t_start) / 3600:.1f} h (time limit): run again with this output "
+                  f"as input to continue; finished (patient, condition) pairs are skipped.", flush=True)
+            break
         P = load_patient(args.raw_dir, pid, grade.get(pid, "Unknown"), device)
         row, d, x, brain, mu, gts = P["row"], P["d"], P["x"], P["brain"], P["mu"], P["gts"]
         spacing, vox_cm3 = P["spacing"], P["vox_cm3"]
@@ -289,7 +293,9 @@ def run(args) -> None:
         print(f"\nTIMING: {np.mean(timings):.1f} s per (patient, condition) for {len(models)} models "
               f"(median {np.median(timings):.1f} s). Full test run: 74 x 13 = 962 pairs -> "
               f"{962 * np.mean(timings) / 3600:.1f} h at this speed.", flush=True)
-    print("EVALUATION DONE", flush=True)
+    finished = completed_pairs(out_csv, keys)
+    left = sum(1 for pid in ids for c in conds if (pid, c["id"]) not in finished)
+    print("EVALUATION DONE" if left == 0 else f"EVALUATION INCOMPLETE: {left} (patient, condition) pairs left", flush=True)
 
 
 def main(argv: Optional[List[str]] = None):
@@ -307,6 +313,8 @@ def main(argv: Optional[List[str]] = None):
     ap.add_argument("--conditions", default="", help="comma-separated DEC-005 ids (default: all 13)")
     ap.add_argument("--max_patients", type=int, default=0, help="0 = all patients of the split")
     ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--time_limit_h", type=float, default=0, help="do not START a new patient after this many hours "
+                    "(Kaggle stops a run at 12 h); 0 = no limit")
     ap.add_argument("--no_nifti", action="store_true", help="skip the NIfTI export (debugging)")
     args = ap.parse_args(argv)
     if args.split == "test" and not args.confirm_test:
