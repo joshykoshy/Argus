@@ -1,66 +1,64 @@
 """
-Statistics pipeline for the ECTE408 study.
+Statistics for the ECTE408 study, to the pre-registered DEC-006 (docs/DECISIONS.md).
 
-- Per-patient paired Wilcoxon signed-rank (seed-averaged per patient), Holm correction within
-  pre-declared families, effect size = median paired difference + bootstrap 95 % CI (seed 42).
-- Official H1-H3 as functions (definitions in the HYPOTHESES block below; edit there only).
-- Clean-to-degraded drop per patient as its own variable (H2).
-- Seed noise floor; differences < 2x floor are flagged "within training noise".
-- HD95 reported as median / IQR (the 373.13 mm both-empty penalty, finding C9, wrecks the mean).
-- Comparisons involving models identical in code (finding C1) are skipped.
+Input: results/raw_metrics_v2.csv from evaluation/evaluate_v2.py (74 test patients, 13 DEC-005
+conditions, models M0 M1 M4 M5 M6, seeds 0-2). Every test uses full-volume 3D Dice (mean of WT, TC, ET),
+averaged over the three seeds per patient, and a paired two-sided Wilcoxon signed-rank test.
 
-Usage: python -m python.analysis.stats [raw_metrics.csv] [tables_dir]
+  H1 (primary)  M4 > M1 at the worst condition (SNR 3, r 0.5, 5 mm, k-space noise)
+  H2            M4's clean-to-worst Dice drop is smaller than M1's (per-patient drops)
+  H3            M4 > M6 at the worst condition (two streams vs early fusion)
+
+Holm correction over these three, alpha 0.05. A hypothesis counts as SUPPORTED only if Holm p < alpha,
+the effect is in the predicted direction, and it is NOT within training noise: a difference smaller than
+twice the seed-to-seed SD is reported as "within training noise" regardless of p (DEC-006).
+Direction: tests are two-sided and the sign of the mean paired difference must match the hypothesis, which is
+at least as strict as a one-sided test.
+
+Secondary (reported, outside the verdict): M4 vs M0 and M5 vs M4 at clean and worst; the 13-condition
+Dice curves of every model with 95 % bootstrap CIs over patients (seed 42); headline table with HD95
+median / IQR (HD95 exists only for clean, SNR 5 r 1.0 1 mm, worst; both-empty = 0 and one-empty = 373.13 mm).
+
+Usage: python -m python.analysis.stats [raw_metrics_v2.csv] [tables_dir]
 """
 
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-RAW_METRICS_CSV = "results/raw_metrics.csv"
+RAW_METRICS_CSV = "results/raw_metrics_v2.csv"
 TABLES_DIR = "tables"
 
-# =============================================================================================
-# HYPOTHESES  (edit here once the team records the official wording in docs/DECISIONS.md)
-# Current wording = study plan / PAPER_DRAFT, NOT the old stats.py thresholds.
-# =============================================================================================
-WORST = "snr8_r0.5"
 CLEAN = "clean"
+MID = "kspace_snr5_r1.0_t1"
+WORST = "kspace_snr3_r0.5_t5"
 ALPHA = 0.05
-H1 = {  # M4 beats M0 by >= margin mean Dice at WORST
-    "model": "M4", "ref": "M0", "condition": WORST, "metric": "dice_mean", "margin": 0.05,
-    "text": "M4 beats M0 by >= 0.05 mean Dice at SNR 8 (r = 0.5)",
-}
-H2 = {  # M4's clean->WORST drop smaller than M0's (paired Wilcoxon on per-patient drops)
-    "model": "M4", "ref": "M0", "metric": "dice_mean", "alpha": ALPHA,
-    "text": "M4's clean-to-SNR8 drop in mean Dice is smaller than M0's (paired Wilcoxon, p < 0.05)",
-}
-H3 = {  # M5 explains >= fraction of M4's gain over M6 at WORST
-    "full": "M4", "low_only": "M5", "ref": "M6", "condition": WORST, "metric": "dice_mean", "fraction": 0.5,
-    "text": "M5 explains >= 50 % of M4's gain over M6 at SNR 8 (r = 0.5)",
-}
-
-# Pre-declared comparison family (test, ref). M4 vs M1 is always included (finding C3).
-COMPARISONS = [("M4", "M1"), ("M4", "M0"), ("M1", "M0"), ("M4", "M5"), ("M4", "M6"), ("M5", "M6"),
-               ("M4", "M2"), ("M4", "M3"), ("M4", "M7")]
-PRIMARY_CONDITIONS = [CLEAN, "snr12_r0.75", WORST]
-PRIMARY_METRIC = "dice_mean"
-SECONDARY_METRICS = ["dice_wt", "dice_tc", "dice_et"]
-DROP_COMPARISONS = [("M4", "M0"), ("M4", "M1")]
-
-# Finding C1: models identical in code. Set SKIP_IDENTICAL = False once Mayank has fixed them.
-IDENTICAL_IN_CODE = {"M2": "M1", "M3": "M5", "M7": "M4"}
-SKIP_IDENTICAL = True
 NOISE_FLOOR_MULTIPLE = 2.0
 BOOTSTRAP_RESAMPLES = 10000
 BOOTSTRAP_SEED = 42
+METRIC = "dice_mean"
+
+# DEC-006. kind "level": test - ref at `condition`; kind "drop": (clean - worst) of ref minus that of test,
+# so a positive effect always means "test is better" and every hypothesis predicts effect > 0.
+HYPOTHESES = {
+    "H1": dict(test="M4", ref="M1", kind="level", condition=WORST,
+               text="M4 beats M1 at the worst condition (SNR 3, r 0.5, 5 mm)"),
+    "H2": dict(test="M4", ref="M1", kind="drop", condition=WORST,
+               text="M4's clean-to-worst Dice drop is smaller than M1's"),
+    "H3": dict(test="M4", ref="M6", kind="level", condition=WORST,
+               text="M4 beats M6 at the worst condition (two streams vs early fusion)"),
+}
+# Secondary: reported, not part of the verdict.
+SECONDARY = [("M4", "M0", WORST), ("M4", "M0", CLEAN), ("M5", "M4", WORST), ("M5", "M4", CLEAN)]
+HEADLINE_CONDITIONS = [CLEAN, MID, WORST]
 
 DICE_COLS = ["dice_wt", "dice_tc", "dice_et", "dice_mean"]
 HD_COLS = ["hd95_wt", "hd95_tc", "hd95_et"]
-REQUIRED = ["model", "seed", "patient_id", "grade", "condition_id"] + DICE_COLS + HD_COLS
+REQUIRED = ["model", "seed", "patient_id", "grade", "condition_id", "noise", "snr", "r", "thick"] + DICE_COLS
 
 
 # ---------------------------------------------------------------------------------------------
@@ -83,7 +81,7 @@ def holm(p: np.ndarray) -> np.ndarray:
 
 def bootstrap_ci(x: np.ndarray, stat=np.median, n: int = BOOTSTRAP_RESAMPLES,
                  seed: int = BOOTSTRAP_SEED, ci: float = 0.95) -> Tuple[float, float, float]:
-    """(point estimate, lo, hi) of `stat` over patients."""
+    """(point estimate, lo, hi) of `stat` over patients, percentile bootstrap."""
     x = np.asarray(x, float)
     if len(x) == 0:
         return np.nan, np.nan, np.nan
@@ -104,37 +102,42 @@ def paired_wilcoxon(diffs: np.ndarray) -> Tuple[float, float]:
 
 
 def patient_level(df: pd.DataFrame) -> pd.DataFrame:
-    """Average seeds per (model, patient, condition)."""
-    keys = ["model", "patient_id", "grade", "condition_id"]
-    cols = [c for c in DICE_COLS + HD_COLS if c in df.columns]
-    return df.groupby(keys, as_index=False)[cols].mean()
+    """Average the seeds per (model, patient, condition); HD95 stays NaN where it was not computed."""
+    cols = [c for c in DICE_COLS + HD_COLS + ["false_tumor_cm3"] if c in df.columns]
+    return df.groupby(["model", "patient_id", "grade", "condition_id"], as_index=False)[cols].mean()
 
 
-def _series(pl: pd.DataFrame, model: str, cond: str, metric: str) -> pd.Series:
+def _series(pl: pd.DataFrame, model: str, cond: str, metric: str = METRIC) -> pd.Series:
     sub = pl[(pl["model"] == model) & (pl["condition_id"] == cond)]
     return sub.set_index("patient_id")[metric].sort_index()
 
 
-def paired_diff_series(pl: pd.DataFrame, a: str, b: str, cond: str, metric: str) -> pd.Series:
-    """a - b per patient, aligned on patient_id."""
-    sa, sb = _series(pl, a, cond, metric), _series(pl, b, cond, metric)
-    common = sa.index.intersection(sb.index)
-    return sa.loc[common] - sb.loc[common]
+def paired_level_diff(pl: pd.DataFrame, test: str, ref: str, cond: str, metric: str = METRIC) -> pd.Series:
+    """test - ref per patient, aligned on patient_id (never by position)."""
+    a, b = _series(pl, test, cond, metric), _series(pl, ref, cond, metric)
+    common = a.index.intersection(b.index)
+    return a.loc[common] - b.loc[common]
 
 
-def paired_diff(pl: pd.DataFrame, a: str, b: str, cond: str, metric: str) -> np.ndarray:
-    return paired_diff_series(pl, a, b, cond, metric).to_numpy()
-
-
-def drop_per_patient(pl: pd.DataFrame, model: str, metric: str, cond: str = WORST) -> pd.Series:
+def drop_per_patient(pl: pd.DataFrame, model: str, cond: str = WORST, metric: str = METRIC) -> pd.Series:
     """clean - degraded, per patient (positive = performance lost)."""
     c, d = _series(pl, model, CLEAN, metric), _series(pl, model, cond, metric)
     common = c.index.intersection(d.index)
     return c.loc[common] - d.loc[common]
 
 
+def paired_drop_diff(pl: pd.DataFrame, test: str, ref: str, cond: str = WORST, metric: str = METRIC) -> pd.Series:
+    """drop(ref) - drop(test) per patient; positive = `test` loses less."""
+    a, b = drop_per_patient(pl, test, cond, metric), drop_per_patient(pl, ref, cond, metric)
+    common = a.index.intersection(b.index)
+    return b.loc[common] - a.loc[common]
+
+
+# ---------------------------------------------------------------------------------------------
+# seed noise floor
+# ---------------------------------------------------------------------------------------------
 def seed_noise_floor(df: pd.DataFrame) -> pd.DataFrame:
-    """SD across seeds of each model's mean Dice, per condition and metric."""
+    """SD across seeds of each model's mean Dice (mean over patients per seed), per condition and metric."""
     rows = []
     for (model, cond), g in df.groupby(["model", "condition_id"]):
         for metric in DICE_COLS:
@@ -144,164 +147,95 @@ def seed_noise_floor(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _floor(floor_df: pd.DataFrame, model: str, cond: str, metric: str) -> float:
-    r = floor_df[(floor_df["model"] == model) & (floor_df["condition"] == cond) & (floor_df["metric"] == metric)]
-    return float(r["seed_sd"].iloc[0]) if len(r) else np.nan
+def seed_sd_of_drop(df: pd.DataFrame, model: str, cond: str = WORST, metric: str = METRIC) -> float:
+    """SD across seeds of a model's clean-to-`cond` drop in mean Dice."""
+    g = df[df["model"] == model]
+    per_seed = (g[g["condition_id"] == CLEAN].groupby("seed")[metric].mean()
+                - g[g["condition_id"] == cond].groupby("seed")[metric].mean())
+    return float(per_seed.std(ddof=1)) if len(per_seed) > 1 else np.nan
 
 
-def skip_reason(test: str, ref: str, models: List[str]) -> Optional[str]:
-    if test not in models or ref not in models:
-        return "model not in data"
-    if SKIP_IDENTICAL:
-        for m in (test, ref):
-            if m in IDENTICAL_IN_CODE:
-                return f"{m} is identical in code to {IDENTICAL_IN_CODE[m]} (finding C1)"
-    return None
+def _level_floor(floor_df: pd.DataFrame, models: List[str], cond: str, metric: str = METRIC) -> float:
+    r = floor_df[(floor_df["model"].isin(models)) & (floor_df["condition"] == cond) & (floor_df["metric"] == metric)]
+    return float(r["seed_sd"].max()) if len(r) else np.nan
+
+
+def _within_noise(effect: float, floor: float) -> bool:
+    return bool(abs(effect) < NOISE_FLOOR_MULTIPLE * floor) if not (np.isnan(effect) or np.isnan(floor)) else False
 
 
 # ---------------------------------------------------------------------------------------------
-# comparison tests
+# tests
 # ---------------------------------------------------------------------------------------------
-def comparison_tests(pl: pd.DataFrame, floor_df: pd.DataFrame, models: List[str]) -> pd.DataFrame:
+def _test_record(d: pd.Series, floor: float) -> Dict:
+    """Paired summary of one comparison from per-patient differences `d` (positive = test better)."""
+    x = d.to_numpy()
+    mean, lo, hi = bootstrap_ci(x, stat=np.mean)
+    med, med_lo, med_hi = bootstrap_ci(x, stat=np.median)
+    stat, p = paired_wilcoxon(x)
+    return {"n_patients": len(x), "mean_diff": mean, "ci95_low": lo, "ci95_high": hi, "median_diff": med,
+            "median_ci95_low": med_lo, "median_ci95_high": med_hi, "wilcoxon_stat": stat, "raw_p": p,
+            "seed_noise_floor": floor, "within_training_noise": _within_noise(mean, floor)}
+
+
+def _diff_and_floor(pl: pd.DataFrame, df: pd.DataFrame, floor_df: pd.DataFrame, test: str, ref: str,
+                    kind: str, cond: str) -> Tuple[pd.Series, float]:
+    if kind == "level":
+        return (paired_level_diff(pl, test, ref, cond), _level_floor(floor_df, [test, ref], cond))
+    floor = np.nanmax([seed_sd_of_drop(df, test, cond), seed_sd_of_drop(df, ref, cond)])
+    return paired_drop_diff(pl, test, ref, cond), float(floor)
+
+
+def evaluate_hypotheses(pl: pd.DataFrame, df: pd.DataFrame, floor_df: pd.DataFrame) -> pd.DataFrame:
+    """H1-H3 with Holm over the three raw p-values and the DEC-006 verdict rule."""
     recs = []
-    for test, ref in COMPARISONS:
-        reason = skip_reason(test, ref, models)
-        if reason:
-            recs.append({"family": "skipped", "test_model": test, "ref_model": ref, "note": reason})
-            continue
-        for cond in PRIMARY_CONDITIONS:
-            for metric, family in [(PRIMARY_METRIC, "primary")] + [(m, "secondary") for m in SECONDARY_METRICS]:
-                d = paired_diff(pl, test, ref, cond, metric)
-                med, lo, hi = bootstrap_ci(d)
-                stat, p = paired_wilcoxon(d)
-                fl = np.nanmax([_floor(floor_df, test, cond, metric), _floor(floor_df, ref, cond, metric)])
-                within = bool(abs(med) < NOISE_FLOOR_MULTIPLE * fl) if not np.isnan(fl) else False
-                recs.append({"family": family, "test_model": test, "ref_model": ref, "condition": cond,
-                             "metric": metric, "n_patients": len(d), "median_diff": med,
-                             "ci95_low": lo, "ci95_high": hi, "wilcoxon_stat": stat, "raw_p": p,
-                             "seed_noise_floor": fl, "within_training_noise": within, "note": ""})
+    for name, h in HYPOTHESES.items():
+        d, floor = _diff_and_floor(pl, df, floor_df, h["test"], h["ref"], h["kind"], h["condition"])
+        recs.append({"hypothesis": name, "text": h["text"], "test_model": h["test"], "ref_model": h["ref"],
+                     "kind": h["kind"], "condition": h["condition"], **_test_record(d, floor)})
     out = pd.DataFrame(recs)
-    out["p_holm"] = np.nan
-    out["significant"] = False
-    for fam in ("primary", "secondary"):  # Holm within each pre-declared family
-        m = out["family"] == fam
-        if m.any():
-            out.loc[m, "p_holm"] = holm(out.loc[m, "raw_p"].to_numpy())
-            out.loc[m, "significant"] = out.loc[m, "p_holm"] < ALPHA
+    out["p_holm"] = holm(out["raw_p"].to_numpy())
+    sig = out["p_holm"] < ALPHA
+    pos = out["mean_diff"] > 0
+    out["verdict"] = np.where(sig & pos & ~out["within_training_noise"], "SUPPORTED", "NOT SUPPORTED")
+    out["note"] = np.select(
+        [sig & pos & out["within_training_noise"], sig & ~pos],
+        ["statistically significant but within training noise (|diff| < 2 x seed SD): not counted",
+         "significant in the OPPOSITE direction"], default="")
     return out
 
 
-def drop_tests(pl: pd.DataFrame, models: List[str]) -> pd.DataFrame:
-    """Per-patient drop (clean -> WORST) compared between models; Holm within this family."""
+def secondary_tests(pl: pd.DataFrame, df: pd.DataFrame, floor_df: pd.DataFrame) -> pd.DataFrame:
+    """Reported, not part of the verdict; Holm only within this secondary family."""
     recs = []
-    for test, ref in DROP_COMPARISONS:
-        if skip_reason(test, ref, models):
-            continue
-        a, b = drop_per_patient(pl, test, PRIMARY_METRIC), drop_per_patient(pl, ref, PRIMARY_METRIC)
-        common = a.index.intersection(b.index)
-        d = (b.loc[common] - a.loc[common]).to_numpy()  # positive = `test` loses LESS than `ref`
-        med, lo, hi = bootstrap_ci(d)
-        stat, p = paired_wilcoxon(d)
-        recs.append({"family": "drop", "test_model": test, "ref_model": ref, "condition": WORST,
-                     "metric": PRIMARY_METRIC, "n_patients": len(d), "median_diff": med,
-                     "ci95_low": lo, "ci95_high": hi, "wilcoxon_stat": stat, "raw_p": p,
-                     "note": "drop(ref) - drop(test); positive = test loses less"})
+    for test, ref, cond in SECONDARY:
+        d, floor = _diff_and_floor(pl, df, floor_df, test, ref, "level", cond)
+        recs.append({"test_model": test, "ref_model": ref, "condition": cond, **_test_record(d, floor)})
     out = pd.DataFrame(recs)
-    if len(out):
-        out["p_holm"] = holm(out["raw_p"].to_numpy())
-        out["significant"] = out["p_holm"] < ALPHA
+    out["p_holm_secondary"] = holm(out["raw_p"].to_numpy())
+    out["note"] = np.where(out["within_training_noise"], "within training noise", "")
     return out
 
 
 # ---------------------------------------------------------------------------------------------
-# official hypotheses
+# curves and headline table
 # ---------------------------------------------------------------------------------------------
-def _verdict(supported: bool, not_supported: bool) -> str:
-    return "SUPPORTED" if supported else ("NOT SUPPORTED" if not_supported else "INCONCLUSIVE")
+def dice_curves(pl: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
+    """Mean Dice per model x condition (seed-averaged per patient) with 95 % bootstrap CI over patients."""
+    meta = df.drop_duplicates("condition_id").set_index("condition_id")[["noise", "snr", "r", "thick"]]
+    rows = []
+    for (model, cond), g in pl.groupby(["model", "condition_id"]):
+        for metric in DICE_COLS:
+            mean, lo, hi = bootstrap_ci(g[metric].to_numpy(), stat=np.mean)
+            rows.append({"model": model, "condition": cond, "metric": metric, "n_patients": len(g),
+                         "mean": mean, "ci95_low": lo, "ci95_high": hi, **meta.loc[cond].to_dict()})
+    return pd.DataFrame(rows)
 
 
-def _noise_fields(effect: float, floor: float) -> Dict:
-    """Flag an effect smaller than NOISE_FLOOR_MULTIPLE x the seed noise floor."""
-    ok = not (np.isnan(effect) or np.isnan(floor))
-    return {"seed_noise_floor": floor,
-            "within_training_noise": bool(abs(effect) < NOISE_FLOOR_MULTIPLE * floor) if ok else False}
-
-
-def eval_h1(pl: pd.DataFrame, floor_df: pd.DataFrame) -> Dict:
-    h = H1
-    d = paired_diff(pl, h["model"], h["ref"], h["condition"], h["metric"])
-    mean, lo, hi = bootstrap_ci(d, stat=np.mean)
-    med, med_lo, med_hi = bootstrap_ci(d, stat=np.median)
-    _, p = paired_wilcoxon(d)
-    verdict = _verdict(lo >= h["margin"], hi < h["margin"])  # mean CI vs the pre-declared margin
-    floor = np.nanmax([_floor(floor_df, m, h["condition"], h["metric"]) for m in (h["model"], h["ref"])])
-    return {"hypothesis": "H1", "text": h["text"], "verdict": verdict, "estimate": mean,
-            "ci95_low": lo, "ci95_high": hi, "median": med, "median_ci95_low": med_lo,
-            "median_ci95_high": med_hi, "p": p, "threshold": h["margin"],
-            **_noise_fields(mean, floor),
-            "detail": "mean paired diff in mean Dice (median reported alongside); SUPPORTED if mean CI "
-                      "lower bound >= margin, NOT SUPPORTED if mean CI upper bound < margin"}
-
-
-def eval_h2(pl: pd.DataFrame, floor_df: pd.DataFrame) -> Dict:
-    h = H2
-    a = drop_per_patient(pl, h["model"], h["metric"])
-    b = drop_per_patient(pl, h["ref"], h["metric"])
-    common = a.index.intersection(b.index)
-    d = (b.loc[common] - a.loc[common]).to_numpy()
-    med, lo, hi = bootstrap_ci(d)
-    _, p = paired_wilcoxon(d)
-    verdict = "SUPPORTED" if (p < h["alpha"] and med > 0) else "NOT SUPPORTED"
-    # a drop is a difference of two conditions' scores: use the larger level floor of both models/conditions
-    floor = np.nanmax([_floor(floor_df, m, c, h["metric"]) for m in (h["model"], h["ref"]) for c in (CLEAN, WORST)])
-    return {"hypothesis": "H2", "text": h["text"], "verdict": verdict, "estimate": med,
-            "ci95_low": lo, "ci95_high": hi, "p": p, "threshold": h["alpha"],
-            **_noise_fields(med, floor),
-            "detail": f"median per-patient (drop {h['ref']} - drop {h['model']}); positive = {h['model']} loses less"}
-
-
-def eval_h3(pl: pd.DataFrame, floor_df: pd.DataFrame) -> Dict:
-    h = H3
-    full_s = paired_diff_series(pl, h["full"], h["ref"], h["condition"], h["metric"])
-    low_s = paired_diff_series(pl, h["low_only"], h["ref"], h["condition"], h["metric"])
-    common = full_s.index.intersection(low_s.index)  # align by patient_id, never by position
-    full, low = full_s.loc[common].to_numpy(), low_s.loc[common].to_numpy()
-    n = len(common)
-    _, p_gain = paired_wilcoxon(full)
-
-    def frac(f, l):
-        g = np.mean(f)
-        return np.mean(l) / g if g != 0 else np.nan
-
-    est = frac(full, low)
-    rng = np.random.default_rng(BOOTSTRAP_SEED)
-    idx = rng.integers(0, n, size=(BOOTSTRAP_RESAMPLES, n))
-    g = full[idx].mean(axis=1)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        boots = low[idx].mean(axis=1) / g
-    lo, hi = np.nanpercentile(boots, [2.5, 97.5])
-    gain_ok = bool(np.mean(full) > 0 and p_gain < ALPHA)  # a fraction is meaningless without a real gain
-    if not gain_ok:
-        verdict = "NOT SUPPORTED"
-    else:
-        verdict = _verdict(lo >= h["fraction"], hi < h["fraction"])
-    # the fraction is only as reliable as its denominator: flag when the full model's gain is within noise
-    floor = np.nanmax([_floor(floor_df, m, h["condition"], h["metric"]) for m in (h["full"], h["ref"])])
-    return {"hypothesis": "H3", "text": h["text"], "verdict": verdict, "estimate": float(est),
-            "ci95_low": float(lo), "ci95_high": float(hi), "p": p_gain, "threshold": h["fraction"],
-            **_noise_fields(float(np.mean(full)), floor),
-            "detail": f"mean({h['low_only']}-{h['ref']}) / mean({h['full']}-{h['ref']}); p = Wilcoxon on "
-                      f"{h['full']} vs {h['ref']} gain; requires a significant positive gain; noise flag "
-                      f"applies to the {h['full']}-{h['ref']} gain"}
-
-
-# ---------------------------------------------------------------------------------------------
-# headline table
-# ---------------------------------------------------------------------------------------------
 def headline_table(df: pd.DataFrame, pl: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for model in sorted(df["model"].unique()):
-        for cond in PRIMARY_CONDITIONS:
+        for cond in HEADLINE_CONDITIONS:
             sub = df[(df["model"] == model) & (df["condition_id"] == cond)]
             psub = pl[(pl["model"] == model) & (pl["condition_id"] == cond)]
             row = {"model": model, "condition": cond, "n_seeds": sub["seed"].nunique(),
@@ -311,10 +245,12 @@ def headline_table(df: pd.DataFrame, pl: pd.DataFrame) -> pd.DataFrame:
                 row[f"{metric}_mean"] = s.mean()
                 row[f"{metric}_seed_sd"] = s.std(ddof=1) if len(s) > 1 else np.nan
             for metric in HD_COLS:
-                v = psub[metric].dropna()
+                v = psub[metric].dropna() if metric in psub else pd.Series(dtype=float)
                 row[f"{metric}_median"] = v.median()
                 row[f"{metric}_q25"] = v.quantile(0.25)
                 row[f"{metric}_q75"] = v.quantile(0.75)
+            if "false_tumor_cm3" in sub:
+                row["false_tumor_cm3_mean"] = sub["false_tumor_cm3"].mean()
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -327,29 +263,41 @@ def run_statistical_tests(raw_metrics_csv: str = RAW_METRICS_CSV, tables_dir: st
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         raise ValueError(f"{raw_metrics_csv} is missing columns: {missing}")
+    need = {m for h in HYPOTHESES.values() for m in (h["test"], h["ref"])} | {m for t in SECONDARY for m in t[:2]}
+    absent = sorted(need - set(df["model"].unique()))
+    if absent:
+        raise ValueError(f"models missing from the data: {absent}")
+    conds = {CLEAN, MID, WORST} - set(df["condition_id"].unique())
+    if conds:
+        raise ValueError(f"conditions missing from the data: {sorted(conds)}")
     out_dir = Path(tables_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    models = sorted(df["model"].unique())
     pl = patient_level(df)
+    n_by_model = pl[pl["condition_id"] == WORST].groupby("model")["patient_id"].nunique()
+    if n_by_model.nunique() > 1:
+        print(f"WARNING: models differ in patient count at the worst condition:\n{n_by_model}")
     floor_df = seed_noise_floor(df)
 
-    tests = pd.concat([comparison_tests(pl, floor_df, models), drop_tests(pl, models)], ignore_index=True)
-    hyp = pd.DataFrame([eval_h1(pl, floor_df), eval_h2(pl, floor_df), eval_h3(pl, floor_df)])
+    hyp = evaluate_hypotheses(pl, df, floor_df)
+    sec = secondary_tests(pl, df, floor_df)
+    curves = dice_curves(pl, df)
     headline = headline_table(df, pl)
 
-    tests.to_csv(out_dir / "statistical_tests.csv", index=False)
-    headline.to_csv(out_dir / "headline_metrics.csv", index=False)
     hyp.to_csv(out_dir / "hypotheses.csv", index=False)
+    sec.to_csv(out_dir / "secondary_tests.csv", index=False)
+    curves.to_csv(out_dir / "dice_curves.csv", index=False)
+    headline.to_csv(out_dir / "headline_metrics.csv", index=False)
     floor_df.to_csv(out_dir / "seed_noise_floor.csv", index=False)
 
-    print("\n================ HYPOTHESIS VERDICTS ================")
+    print("\n================ HYPOTHESIS VERDICTS (DEC-006) ================")
     for _, r in hyp.iterrows():
-        print(f"{r['hypothesis']}: {r['verdict']} - {r['text']}\n    estimate {r['estimate']:+.4f} "
-              f"[{r['ci95_low']:+.4f}, {r['ci95_high']:+.4f}], p = {r['p']:.3g}"
-              + ("  [WITHIN TRAINING NOISE]" if r["within_training_noise"] else ""))
-    print("=====================================================\n")
-    return {"statistical_tests": tests, "headline_metrics": headline, "hypotheses": hyp,
+        print(f"{r['hypothesis']}: {r['verdict']} - {r['text']}\n    mean diff {r['mean_diff']:+.4f} "
+              f"[{r['ci95_low']:+.4f}, {r['ci95_high']:+.4f}], Holm p = {r['p_holm']:.3g} (raw {r['raw_p']:.3g}), "
+              f"2 x seed SD = {NOISE_FLOOR_MULTIPLE * r['seed_noise_floor']:.4f}"
+              + (f"\n    NOTE: {r['note']}" if r["note"] else ""))
+    print("===============================================================\n")
+    return {"hypotheses": hyp, "secondary_tests": sec, "dice_curves": curves, "headline_metrics": headline,
             "seed_noise_floor": floor_df}
 
 

@@ -15,3 +15,7 @@ __pycache__/
 !results/**/*.csv
 !results/**/*.pt
 figures/interactive/*.html
+
+# Step D outputs (large / validation scratch)
+predictions/
+results/val_check/
