@@ -54,8 +54,8 @@ The four augmented models are within about 0.012 Dice of each other at every con
   19.8 cm3 of tumour where there is none, versus about 0.4 cm3 for every augmented model. This is the same
   failure mode as finding C11, now triggered by noise rather than by training on tumour-only slices.
 - **HD95** (median WT, mm): M0 jumps from 5.7 (clean) to 105 (worst); augmented models stay at 3.3 to 4.9 across the three conditions.
-- **M0's clean Dice (0.786) is lower than the 0.84 seen on validation**, and its seed SD (0.048) is
-  about ten times that of the augmented models. Worth a sentence in the paper: the clean-trained model is
+- **M0's clean Dice (0.786) matches its Step C validation value (0.798, mean of 3 seeds)**; the 0.84
+  was the separate Step A run. Its seed SD (0.048) is about ten times that of the augmented models. Worth a sentence in the paper: the clean-trained model is
   also the least stable across training seeds.
 
 ## Caveats

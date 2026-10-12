@@ -33,7 +33,7 @@ being redone by Joshua on Colab Pro, in agreement with Mayank. Order:
       `training/train_kaggle.ipynb`, which restores and resumes the saved runs.
       Done 2026-10-10. Validation, worst condition, mean of 3 seeds: M0 0.543,
       M1 0.756, M4 0.750, M5 0.758, M6 0.758 -> augmentation is the effect; M4 adds nothing
-- [ ] R3 **Step D (Nazir, `docs/handoff/TASK_NAZIR_STEP_D.md`):** evaluate on the 74 test patients (13 conditions, Dice + HD95 +
+- [x] R3 **Step D (Nazir, `docs/handoff/TASK_NAZIR_STEP_D.md`):** evaluate on the 74 test patients (13 conditions, Dice + HD95 +
       NIfTI predictions) -> Stage 3 (MATLAB) + Stage 4 (stats, DEC-006)
 
 ## Stage 0 - Setup (done)
@@ -128,9 +128,9 @@ more robust, so plan for that.
 - [ ] M0 vs M4 viewers for the 5 example patients (needs predictions)
 
 ## Stage 5 - Finish the paper
-- [ ] 5.0 Literature: verify every reference, write Related Work (Nazir, pending)
-- [ ] 5.1 Results section (numbers from Stages 3-4)
-- [ ] 5.2 Discussion (what it means, limitations, why M4 did/didn't help)
-- [ ] 5.3 Abstract and conclusion (written last)
+- [x] 5.0 Literature: verify every reference, write Related Work (Nazir, done 2026-10-12)
+- [ ] 5.1 Results section (numbers from Stages 3-4) -> stats parts drafted 2026-10-12 in PAPER_DRAFT.md 4.1-4.4; 4.5-4.6 wait for Stage 3
+- [ ] 5.2 Discussion (what it means, limitations, why M4 did/didn't help) -> drafted; [MATLAB] slots left
+- [ ] 5.3 Abstract and conclusion (written last) -> first draft in; finalise after Stage 3
 - [ ] 5.4 Figure/table polish, references, proofread
 - [ ] 5.5 Selective push of your final files to `team/matlab-analysis`
