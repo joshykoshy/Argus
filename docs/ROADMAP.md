@@ -90,16 +90,19 @@ Gate: do not start Stage 3 until **all** predictions are written (a half-full
 folder would mix models).
 
 ## Stage 3 - Plug real predictions into your tools (you)
-- [ ] 3.0 Check the Python pipeline's 192x192 crop didn't cut off any tumor:
+- [x] 3.0 Check the Python pipeline's 192x192 crop didn't cut off any tumor:
       compare `results/predictions/ground_truth/GT_*.nii.gz` volumes against
       `results/volumetrics_gt.csv` (raw files). Any difference = tumor the
       models could never predict.
-- [ ] 3.1 Rerun volumetrics on predictions: set `SOURCE = 'pred'` in
+- [x] 3.1 Rerun volumetrics on predictions: set `SOURCE = 'pred'` in
       `matlab/volumetrics.m` (NIfTIs exist for clean, snr12_r0.75, snr8_r0.5
       only; the other 10 conditions have volumes in `raw_metrics.csv`)
-- [ ] 3.2 Measurement error per model per scan condition: how wrong is the
+- [x] 3.2 Measurement error per model per scan condition: how wrong is the
       predicted tumor volume as the scan gets worse? (the clinical result)
-- [ ] 3.3 Agreement (Bland-Altman, ICC) for M0 vs M4 at clean and worst condition
+- [x] 3.3 Agreement (Bland-Altman, ICC) for M0 vs M4 at clean and worst condition
+      -> done 2026-10-12 on seed-0 predictions (DEC-005 conditions, M0/M1/M4/M5/M6):
+         check_pred_grid.m 0 voxels differ; results/volumetrics_pred.csv, results/agreement_stage3.csv,
+         figures/agreement_stage3_*.png; written up in PAPER_DRAFT.md 4.5
 - [ ] 3.4 Diagnostic report panel 4 (prediction overlay) for the 5 patients
 - [ ] 3.5 3D comparisons M0 vs M4 with error heatmaps
 

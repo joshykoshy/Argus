@@ -36,7 +36,7 @@ OUT_FMT    = 'figures/diagnostic_%d_%s.png';
 SNR = 8;  R = 0.5;  D0 = 0.20;  SEED = 42;
 ROWS = 25:216;  COLS = 29:220;
 USE_PREDICTIONS = false;              % Stage 3 only, when ALL predictions exist
-PRED_FMT   = 'results/predictions/%s_%s_snr8_r0.5.nii.gz';
+PRED_FMT   = 'results/predictions/%s_%s_kspace_snr3_r0.5_t5.nii.gz';
 PRED_MODEL = 'M4';
 COL = [0.00 0.45 0.70; 0.95 0.60 0.00; 0.85 0.15 0.15];
 

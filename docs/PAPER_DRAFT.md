@@ -49,8 +49,11 @@ pre-registered hypotheses was supported: the dual-stream network did not beat
 the plain augmented U-Net (difference -0.004) or early fusion (-0.004), and
 did not lose less accuracy from clean to worst. All differences between
 augmented models were below twice the seed-to-seed SD.
-`[MATLAB: one sentence on tumor-volume agreement, e.g. Bland-Altman bias and
-ICC for M0 vs M4 at the worst condition.]`
+Tumor-volume agreement followed the same pattern: at the worst condition the
+augmented models kept a median absolute whole-tumor volume error of 7.0-7.8 %
+(ICC 0.93-0.94, unchanged from clean), while the clean-trained baseline's
+error rose to 25.8 % (ICC 0.74), with a near-zero mean bias hiding 95 % limits
+of agreement of +/-73 cm3.
 
 **Conclusion.** For segmentation under simulated low-field degradation,
 what the network is trained on matters; how the input is split by frequency
@@ -167,8 +170,10 @@ Each axial slice was cropped in-plane to 192 x 192 (rows 24-215, columns
 28-219, zero-based). This crop retains at least 99.9 % of brain voxels for
 every patient (checked in preprocessing) and loses 18 tumor voxels in total
 across all 369 patients (one patient; 0.00005 % of tumor volume;
-`matlab/check_crop_retention.m`). `[MATLAB: Stage 3.0 confirms this on the
-written prediction grids.]`
+`matlab/check_crop_retention.m`); none of the 74 test patients is affected.
+The label maps written by the evaluation pipeline (3.4) were checked against
+the raw BraTS segmentations: identical grid, voxel spacing and labels for all
+74 test patients, 0 differing voxels (`matlab/check_pred_grid.m`).
 
 Ground-truth tumor sizes in the test set (median, range): WT 81.3 cm^3
 (16.6-230.9), TC 28.6 cm^3 (0.8-159.9), ET 13.2 cm^3 (0-79.0); ET is absent
@@ -521,13 +526,50 @@ with its validation value from the same runs (0.798, mean of three seeds).
 
 ### 4.5 Morphometric agreement
 
-`[MATLAB: Stage 3.1-3.3. Per model at clean / SNR 5 / worst (seed 0):
-median absolute WT/TC/ET volume error (%), Bland-Altman bias and 95 % limits,
-ICC(A,1) with bootstrap CI, and component count vs ground truth. Lead with
-M0 vs M4 (or M1) at the worst condition. Expect M0's false-tumor islands to
-show up as positive volume bias and a raised component count; the synthetic
-validation (3.8) showed that ICC can stay high under such errors, so report
-bias alongside ICC.]`
+Seed-0 predictions of all five models at clean, SNR 5 (r 1.0, 1 mm) and
+worst, 74 test patients each (`results/volumetrics_pred.csv`,
+`results/agreement_stage3.csv`; Figures `figures/agreement_stage3_*.png`).
+
+**Table 6.** Whole-tumor volume agreement, clean / worst. Bias and 95 %
+limits of agreement (LoA) in cm^3; error = median absolute volume error.
+
+| Model | Error (%) | Bias (LoA) clean | Bias (LoA) worst | ICC(A,1) clean | ICC(A,1) worst (95 % CI) |
+|---|---|---|---|---|---|
+| M0 | 5.8 / 25.8 | -3.0 (-34, +28) | -0.2 (-74, +73) | 0.957 | 0.737 (0.55-0.89) |
+| M1 | 6.5 / 7.1 | -4.7 (-35, +26) | -5.8 (-42, +30) | 0.956 | 0.938 (0.87-0.98) |
+| M4 | 6.8 / 7.0 | -4.6 (-38, +29) | -4.8 (-40, +31) | 0.948 | 0.942 (0.88-0.98) |
+| M5 | 6.3 / 7.8 | -4.2 (-38, +30) | -5.3 (-45, +34) | 0.947 | 0.928 (0.84-0.98) |
+| M6 | 6.8 / 7.2 | -4.3 (-35, +27) | -5.1 (-41, +31) | 0.956 | 0.940 (0.87-0.98) |
+
+**The augmented models measured tumor volume about as well at the worst
+condition as on clean scans.** Their median absolute volume error at the worst
+condition was 7.0-7.8 % for WT, 12.7-14.5 % for TC and 17.1-18.5 % for ET
+(clean: 6.3-6.8 %, 7.8-9.8 %, 11.4-13.9 %), and their limits of agreement
+widened by only a few cm^3. They slightly underestimated WT at every
+condition (bias -4 to -6 cm^3; for M1 the bias CI excludes zero). The four
+were indistinguishable from each other, as in Dice.
+
+**The clean-trained model's volumes became unreliable, and its mean bias
+hid it.** At the worst condition M0's median WT volume error rose from 5.8 %
+to 25.8 %, TC to 65.9 % and ET to 37.5 %, ICC(A,1) fell to 0.74 (WT), 0.58
+(TC) and 0.73 (ET), and the WT limits of agreement widened from about +/-30
+to +/-73 cm^3. Yet its WT mean bias was -0.2 cm^3: spurious tumor added
+elsewhere and true tumor missed cancel out on average. The per-patient
+errors run both ways (Figure, Bland-Altman). A bias-only summary would have
+called M0 the most accurate model; the limits of agreement and ICC do not.
+At SNR 5 the same model overestimated instead (WT bias +12.1 cm^3, median
+error +17.8 %).
+
+**Fragmentation.** M0's noisy predictions split into very many pieces (median
+extra connected components over ground truth: 1,116 at SNR 5 and 1,911 at the
+worst condition for WT), the scattered false tumor of 4.4. The augmented
+models also fragmented somewhat under noise (median 43-69 extra WT pieces at
+the worst condition, 0-2 on clean scans), but these are small specks: the
+volume they carry does not show in the volume error.
+
+**ET where there is none.** All five test patients without ET (all LGG)
+received a non-empty ET prediction from every model at every condition (M1
+on clean scans: 4 of 5). No model missed a region that was present.
 
 ### 4.6 Qualitative cases
 
@@ -570,8 +612,18 @@ better".
 **Clinical reading.** A segmentation that mislabels distant tissue as tumor
 inflates volume and fragments the lesion even when overlap looks
 acceptable; M0's false-tumor volume and HD95 under noise show this
-directly. `[MATLAB: connect to 4.5 - does the volume error of the augmented
-models stay within a clinically tolerable range at the worst condition?]`
+directly, and the volume analysis (4.5) shows its consequence: M0's
+per-patient WT volume could be off by up to about 73 cm^3 at the worst
+condition, while the augmented models stayed within the same roughly
++/-35 cm^3 limits they had on clean scans. A median 7 % WT volume error is in
+the range usually reported between expert raters `[CITE: inter-rater
+volumetric variability in glioma, e.g. BraTS or RANO literature - TEAM to
+source and verify]`; the augmented models' ET error (about 18 %) is larger,
+as expected for a thin shell (below). Two practical warnings: a near-zero
+mean bias can coexist with large per-patient error, so agreement must be
+judged from the limits of agreement and ICC; and every model predicted ET in
+patients who have none, so ET presence from these models should not be
+trusted in LGG.
 
 **Points from the morphometric validation (hold regardless of model).**
 
@@ -583,8 +635,10 @@ models stay within a clinically tolerable range at the worst condition?]`
   synthetic validation a 2 mm shift kept ICC = 1.000 while ET Dice fell to
   0.71, and three spurious blobs kept Dice at 0.997 and ICC at 1.000; only the
   component count detected them. Report all three kinds of metric.
-- **ICC can flatter a biased method.** A systematic +17 % volume error still
-  gave ICC(A,1) = 0.957; report Bland-Altman bias alongside ICC.
+- **ICC can flatter a biased method, and bias can flatter a noisy one.** A
+  systematic +17 % volume error still gave ICC(A,1) = 0.957 (synthetic
+  validation), and M0's -0.2 cm^3 WT bias at the worst condition came with
+  +/-73 cm^3 limits of agreement (4.5). Report bias, limits and ICC together.
 
 **Implication.** For deploying segmentation on low-field scanners, effort
 is better spent on realistic degradation during training than on
@@ -606,7 +660,8 @@ frequency-specific architectures of this kind.
 - **One decomposition.** A single Gaussian cutoff (D0 = 0.20) was tested,
   chosen by design rather than tuned.
 - **Morphometrics on seed 0 at three conditions** only; the other ten
-  conditions have volumes but not shapes. `[MATLAB: confirm scope.]`
+  conditions and seeds 1-2 have Dice and volumes (`raw_metrics_v2.csv`) but
+  no shape measures or agreement analysis.
 - **Pre-registration is internal** (a dated decision log in the repository),
   not a public registry.
 - MATLAB figure noise realisations differ from the Python test set (same
@@ -619,8 +674,10 @@ U-Net far more robust (+0.22 Dice at the worst condition, with spurious
 tumor eliminated), while frequency-band decomposition, as a dual-stream or
 early-fusion design, added nothing measurable over a conventional U-Net
 trained on the same data. All three pre-registered hypotheses for the
-band-split design were not supported. `[MATLAB: one sentence on whether
-tumor volumes remain reliable.]`
+band-split design were not supported. With degradation-aware training,
+tumor volumes stayed about as reliable at the worst condition as on clean
+scans (median whole-tumor error about 7 %); without it, per-patient volumes
+became unreliable even though their average error was close to zero.
 
 ---
 

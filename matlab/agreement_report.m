@@ -23,7 +23,7 @@ if ~exist('OUT_DIR', 'var'),  OUT_DIR  = 'results'; end
 if ~exist('FIG_DIR', 'var'),  FIG_DIR  = 'figures'; end
 if ~exist('TAG', 'var'),      TAG      = 'stage3'; end
 if ~exist('COMPARE', 'var'),  COMPARE  = {'M0', 'M4'}; end   % baseline vs proposed
-CONDS = ["clean", "snr12_r0.75", "snr8_r0.5"];               % mild -> worst
+CONDS = ["clean", "kspace_snr5_r1.0_t1", "kspace_snr3_r0.5_t5"];               % mild -> worst
 REG   = ["WT", "TC", "ET"];
 
 gt = readtable(GT_CSV, 'TextType', 'string');
@@ -89,7 +89,7 @@ for k = 1:3
             'MarkerFaceColor', cm(i, :), 'LineWidth', 1.5, 'DisplayName', models(i));
     end
     yline(ax, 0, 'k:', 'HandleVisibility', 'off');
-    xticks(ax, 1:3);  xticklabels(ax, {'clean', 'SNR 12, r 0.75', 'SNR 8, r 0.5'});
+    xticks(ax, 1:3);  xticklabels(ax, {'clean', 'SNR 5', 'SNR 3, r 0.5, 5 mm'});
     xlim(ax, [0.6 3.4]);
     ylabel(ax, 'Volume error (%), median and IQR');
     title(ax, REG(k), 'FontWeight', 'normal');
