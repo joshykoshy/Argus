@@ -4,9 +4,9 @@ Status: **draft for the team** (roadmap step 1.5). Written from the code as
 it stands, so every number here is traceable to a file. Square-bracket notes:
 
 - `[CITE: ...]` - a reference is needed; the suggested source is listed in
-  the reference list at the end, **marked "verify"**: check each one against
-  the actual paper before submission (titles, years and venues were written
-  from memory).
+  the reference list at the end. The list was verified on 2026-10-12 (all
+  entries confirmed; see `docs/paper/references_check.md`). The few entries
+  marked "metadata only" there still need their content checked before submission.
 - `[TEAM: ...]` - a decision the team still has to make (see
   `LAB_NOTEBOOK.md`, Critical findings C1-C7).
 - `[RESULT]` - filled in after Stage 3-4.
@@ -24,9 +24,11 @@ with morphometric validation.*
 Magnetic resonance imaging is the reference modality for brain tumor
 diagnosis, treatment planning and follow-up, but conventional high-field
 scanners (1.5-3 T) are expensive to buy, site and run, which concentrates
-them in large hospitals in high-income settings [CITE: global MRI access].
-Low-field systems (below ~0.5 T, including recent portable scanners around
-0.064 T) cost a fraction as much, need little shielding, and can be brought
+them in large hospitals in high-income settings [Arnold 2023; Ogbole 2018; Anazodo 2023]. In West Africa, for
+example, a survey found 84 MRI units for about 373 million people, most of Nigeria's being low-field systems
+[Ogbole 2018].
+Low-field systems (defined as 0.25-1 T by Marques et al.; recent portable scanners
+operate near 0.064 T [Iglesias 2023]) cost a fraction as much, need little shielding, and can be brought
 to the bedside [CITE: Marques 2019; Sheth 2021]. The price is image quality:
 signal grows roughly with field strength, so a low-field image has a lower
 signal-to-noise ratio (SNR), and scanners compensate by acquiring larger
@@ -373,38 +375,49 @@ Altman, ICC; fragmentation).
 
 ---
 
-## References (all to verify before submission)
+## References
+
+Verified 2026-10-12 against Crossref / PubMed / arXiv: details in `docs/paper/references_check.md`,
+BibTeX in `docs/paper/references.bib`. The related-work references are in that file and are not repeated here.
 
 - Bakas S, et al. Advancing The Cancer Genome Atlas glioma MRI collections
   with expert segmentation labels and radiomic features. *Scientific Data*
-  2017. (verify)
+  2017.
 - Bakas S, et al. Identifying the best machine learning algorithms for brain
   tumor segmentation, progression assessment, and overall survival
-  prediction in the BRATS challenge. arXiv:1811.02629, 2018. (verify)
+  prediction in the BRATS challenge. arXiv:1811.02629, 2018.
 - Bland JM, Altman DG. Statistical methods for assessing agreement between
-  two methods of clinical measurement. *Lancet* 1986. (verify)
+  two methods of clinical measurement. *Lancet* 1986.
 - Gudbjartsson H, Patz S. The Rician distribution of noisy MRI data.
-  *Magnetic Resonance in Medicine* 1995. (verify)
+  *Magnetic Resonance in Medicine* 1995.
 - Holm S. A simple sequentially rejective multiple test procedure.
-  *Scandinavian Journal of Statistics* 1979. (verify)
+  *Scandinavian Journal of Statistics* 1979.
 - Lorensen WE, Cline HE. Marching cubes: a high resolution 3D surface
-  construction algorithm. *SIGGRAPH* 1987. (verify)
+  construction algorithm. *SIGGRAPH* 1987.
 - Marques JP, Simonis FFJ, Webb AG. Low-field MRI: an MR physics perspective.
-  *Journal of Magnetic Resonance Imaging* 2019. (verify)
+  *Journal of Magnetic Resonance Imaging* 2019.
 - McGraw KO, Wong SP. Forming inferences about some intraclass correlation
-  coefficients. *Psychological Methods* 1996. (verify)
+  coefficients. *Psychological Methods* 1996.
 - Menze BH, et al. The multimodal brain tumor image segmentation benchmark
-  (BRATS). *IEEE Transactions on Medical Imaging* 2015. (verify)
+  (BRATS). *IEEE Transactions on Medical Imaging* 2015.
 - Ronneberger O, Fischer P, Brox T. U-Net: convolutional networks for
-  biomedical image segmentation. *MICCAI* 2015. (verify)
+  biomedical image segmentation. *MICCAI* 2015.
 - Sheth KN, et al. Assessment of brain injury using portable, low-field
   magnetic resonance imaging at the bedside of critically ill patients.
-  *JAMA Neurology* 2021. (verify)
+  *JAMA Neurology* 2021.
 - Shrout PE, Fleiss JL. Intraclass correlations: uses in assessing rater
-  reliability. *Psychological Bulletin* 1979. (verify)
+  reliability. *Psychological Bulletin* 1979.
 - Wadell H. Volume, shape, and roundness of quartz particles. *Journal of
-  Geology* 1935. (verify)
+  Geology* 1935.
 - Wilcoxon F. Individual comparisons by ranking methods. *Biometrics
-  Bulletin* 1945. (verify)
-- [CITE: global MRI access] - a source on MRI scanner density by country
-  income level is still needed.
+  Bulletin* 1945.
+- Arnold TC, Freeman CW, Litt B, Stein JM. Low-field MRI: clinical promise and
+  challenges. *Journal of Magnetic Resonance Imaging* 2023;57(1):25-44.
+- Ogbole GI, Adeyomoye AO, Badu-Peprah A, Mensah Y, Nzeh DA. Survey of magnetic
+  resonance imaging availability in West Africa. *Pan African Medical Journal*
+  2018;30:240.
+- Anazodo UC, Ng JJ, et al. A framework for advancing sustainable magnetic resonance
+  imaging access in Africa. *NMR in Biomedicine* 2023;36(3):e4846.
+- Iglesias JE, Schleicher R, Laguna S, Billot B, et al. Quantitative brain morphometry of
+  portable low-field-strength MRI using super-resolution machine learning.
+  *Radiology* 2023;306(3):e220522.
