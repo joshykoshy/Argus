@@ -44,7 +44,8 @@ full-volume 3D Dice with paired Wilcoxon tests and Holm correction.
 worst condition (SNR 3, 0.5 in-plane resolution, 5 mm slices) the augmented
 models reached a mean Dice of 0.763-0.769, against 0.549 for the clean-trained
 baseline (M4 minus M0 = +0.216, 95 % CI 0.195-0.237), and they removed the
-baseline's spurious tumor on tumor-free slices (0.4 vs 19.8 cm3). None of the
+baseline's spurious tumor on tumor-free slices (0.4 vs 19.8 cm3), about a
+quarter of which lay outside the brain. None of the
 pre-registered hypotheses was supported: the dual-stream network did not beat
 the plain augmented U-Net (difference -0.004) or early fusion (-0.004), and
 did not lose less accuracy from clean to worst. All differences between
@@ -129,9 +130,8 @@ the same training data fed to a conventional network.
    analysis (Bland-Altman, ICC) that was itself validated on synthetically
    damaged masks with known errors.
 5. An independent MATLAB re-implementation of the degradation and
-   decomposition physics, numerically matched to the Python code.
-   `[TEAM: true for the in-plane truncation and the decomposition; the
-   k-space noise and slice-thickness steps are not yet ported, see 2.6.]`
+   decomposition physics, numerically matched to the Python code
+   (all 13 degradation conditions within 1.1e-6 of the mean brain intensity).
 
 ---
 
@@ -335,18 +335,19 @@ predicted WT volume (cm^3) on slices containing no true tumor.
 
 ### 3.6 Implementation verification and spectral analysis
 
-**Parity.** The in-plane truncation and the decomposition were implemented
-independently in MATLAB (`degrade_slice.m`, `decompose_slice.m`) and matched
-the PyTorch code on five random 192 x 192 slices with shared noise arrays,
-across all conditions of the original plan and four cutoffs D0 in
-{0.10, 0.15, 0.20, 0.30}; `tests/test_degradation.py::test_matlab_python_parity`
-requires a maximum absolute difference below 1e-4 `[TEAM: report the
-measured value]`. Rerunning the MATLAB side on a second machine and MATLAB
-version (R2026b vs R2025a) reproduced the stored outputs exactly
-(`matlab/env_check.m`). `[TEAM: the MATLAB port still adds noise after
-truncation (the original order). Either port the k-space noise and slice
-thickness of 3.2 to degrade_slice.m and rerun parity, or limit the parity
-claim to truncation and decomposition.]`
+**Parity.** The degradation of 3.2 was re-implemented independently in
+MATLAB (`matlab/reference/degrade_volume.m`) and compared with the Python
+function used for training and evaluation (`pilot.pilot.degrade_volume`) on
+the same 9-slice, 2-channel, 192 x 192 volume and the same noise arrays,
+for all 13 conditions (`test_degrade_volume_parity.m`). The largest
+difference was 4.3e-4 intensity units, 1.1e-6 of the mean brain intensity,
+i.e. float32 rounding (`results/degrade_volume_parity.csv`). The
+decomposition (`decompose_slice.m`) matched the PyTorch code on five random
+slices for four cutoffs D0 in {0.10, 0.15, 0.20, 0.30}
+(`tests/test_degradation.py::test_matlab_python_parity`, tolerance 1e-4
+`[TEAM: report the measured value]`). Rerunning the MATLAB side on a second
+machine and MATLAB version (R2026b vs R2025a) reproduced the stored outputs
+exactly (`matlab/env_check.m`).
 
 **Where the image energy is.** On the axial slice with the largest tumor
 area for 12 test patients (FLAIR and T1ce; `matlab/spectral_check.m`), the
@@ -356,15 +357,35 @@ excluding the zero-frequency term (96.9 % and 95.2 % including it). Under the
 Gaussian split the low band carries 97.8 % (FLAIR) and 96.6 % (T1ce) of the
 band energy. This is independent of the degradation.
 
-**How the degradation hits each band.** `[TEAM/MATLAB: the band-SNR table in
-the previous draft was computed for the original range (SNR 30-8, noise after
-truncation) and must not go in the paper as is. Rerun spectral_check.m with
-the DEC-005 conditions once the k-space noise is ported, and report low/high
-band SNR (dB) for clean-to-worst. Expected from the physics: the low band
-stays far cleaner than the high band at every condition.]` Caveat for that
-analysis: the high-band anatomical power includes the sharp brain/background
-edge of skull-stripped images, which inflates high-band SNR relative to the
-tumor interior.
+**How the degradation hits each band.** For each DEC-005 condition we
+computed a band SNR: clean-image power in the band divided by the power of
+the degradation error (degraded minus clean slice: noise plus lost in-plane
+and through-plane resolution) in the same band, in dB (`degrade_volume.m` on
+a 5-slice slab around each slice, noise seed 42).
+
+| SNR | r 1.0, 1 mm | r 1.0, 5 mm | r 0.5, 1 mm | r 0.5, 5 mm |
+|---|---|---|---|---|
+| | *FLAIR, low / high band (dB)* | | | |
+| 8 | 16.4 / 2.6 | 16.3 / 1.7 | 16.1 / 1.3 | 16.0 / 0.9 |
+| 5 | 12.3 / -1.4 | 12.3 / -1.8 | 12.1 / -1.8 | 12.0 / -2.0 |
+| 3 | 7.8 / -5.7 | 7.8 / -5.8 | 7.6 / -5.6 | 7.6 / -5.7 |
+| | *T1ce, low / high band (dB)* | | | |
+| 8 | 15.1 / 3.4 | 14.7 / 1.1 | 14.8 / 1.9 | 14.4 / 0.7 |
+| 5 | 11.0 / -0.6 | 10.9 / -1.7 | 10.8 / -1.1 | 10.6 / -1.7 |
+| 3 | 6.5 / -4.9 | 6.5 / -5.4 | 6.3 / -4.9 | 6.3 / -5.2 |
+
+(`results/spectral_check.csv`, Figure `figures/spectral_band_snr.png`.)
+
+The low band keeps more anatomy than error at every condition (6-16 dB),
+while the high band falls below 0 dB, more error than anatomy, from SNR 5
+on, reaching about -5 to -6 dB at SNR 3. Noise sets the band SNR almost
+entirely; halving resolution and 5 mm slices lower the high band by at most
+about 2 dB at SNR 8 and change little at SNR 3, where noise already
+dominates. The premise of band separation therefore holds strongly in this
+range: at the noise levels where the clean-trained model fails, most of the
+high band is degradation. Caveat: the high-band anatomical power includes
+the sharp brain/background edge of skull-stripped images, which inflates
+high-band SNR relative to the tumor interior.
 
 ### 3.7 Morphometric biomarkers
 
@@ -519,6 +540,28 @@ about 100 mm, while every augmented model stayed below 5 mm. Overlap scores
 understate this failure, since a few spurious islands far from the tumor
 cost little Dice but make the segmentation clinically unusable.
 
+**Where M0's false tumor lies.** The 3D renderings (4.6) showed that much of
+M0's spurious tumor is outside the brain: in the background around the head
+and on slices above and below it. Measured on the seed-0 predictions
+(`results/pred_outside_brain.csv`, brain = FLAIR > 0), 24 % of M0's predicted
+WT volume at the worst condition (23.4 cm^3 per patient) and 16 % at SNR 5
+lay outside the brain, against under 1 % for every augmented model
+(0.2-0.6 cm^3). No post-processing was pre-specified, so the results above
+use the raw predictions. As a sensitivity analysis, zeroing predictions
+outside the brain mask:
+
+| Seed 0, WT | M0 SNR 5 | M0 worst | Augmented, worst |
+|---|---|---|---|
+| Dice, raw -> masked | 0.784 -> 0.883 | 0.647 -> 0.763 | 0.861-0.864 -> 0.863-0.866 |
+| Median abs. volume error, raw -> masked | 19.5 % -> 6.3 % | 25.8 % -> 12.1 % | 7.0-7.8 % -> 7.0-7.8 % |
+
+A brain mask, standard in any clinical pipeline, would remove most of M0's
+deficit at SNR 5 and about half of it at the worst condition; the augmented
+models remain clearly better there (WT Dice +0.10, half the volume error).
+The pre-registered comparisons between augmented models are unaffected.
+`[TEAM: decide whether to also report the masked M4 vs M0 secondary test on
+all seeds; the effect size +0.216 in 4.3 includes out-of-brain tumor.]`
+
 M0 was also the least reproducible model: the seed-to-seed SD of its clean
 Dice was 0.048, against 0.0004-0.005 for the augmented models
 (`tables/seed_noise_floor.csv`). Its clean test Dice (0.786) is consistent
@@ -573,9 +616,33 @@ on clean scans: 4 of 5). No model missed a region that was present.
 
 ### 4.6 Qualitative cases
 
-`[MATLAB: Stage 3.4-3.5. Diagnostic report panel 4 for the five cases of
-3.9, and 3D surface-error comparisons M0 vs M4 at the worst condition
-(matlab/render_tumor_3d.m; viz3d viewers).]`
+Figures `figures/diagnostic_<case>_<id>.png` show, for the five cases of
+3.9, the clean and worst-condition FLAIR, the ground truth, the M0 and M4
+predictions (seed 0) on the degraded slice, and the band decomposition;
+`figures/render3d_stage3_<case>_<model>.png` show the 3D truth, prediction and
+WT surface-error map (signed distance of each predicted surface point to the
+true boundary; renderer validated on known 2 mm dilation/erosion, 3.8).
+
+**Table 7.** Worst condition, seed 0 (`results/render3d_stage3_surface_error.csv`).
+
+| Case | Mean 3D Dice M0 / M4 | Mean abs. surface distance (mm) M0 / M4 | Surface > 2 mm off, M0 / M4 |
+|---|---|---|---|
+| 1 HGG small | 0.13 / 0.56 | 78.3 / 15.7 | 89 % / 33 % |
+| 2 HGG typical | 0.46 / 0.78 | 51.9 / 4.0 | 86 % / 31 % |
+| 3 HGG large | 0.03 / 0.23 | 54.0 / 7.6 | 97 % / 69 % |
+| 4 LGG with ET | 0.25 / 0.77 | 63.5 / 7.0 | 91 % / 23 % |
+| 5 LGG no ET | 0.31 / 0.44 | 35.5 / 4.2 | 85 % / 48 % |
+
+In every case M0's predicted surface is dominated by scattered islands, many
+outside the brain, which put its mean surface distance at 35-78 mm. M4's
+surface follows the true boundary (mean 4-8 mm) apart from a few small
+distant specks, which explain the larger mean in case 1 (small tumor, so
+the specks weigh more). Two cases are hard for every model: in case 3 (the
+largest tumor) all models under-segment the core even on clean scans (TC
+Dice about 0.3-0.4, seed-averaged) and at the worst condition M4 recovers
+half the WT volume (84 of 170 cm^3); in case 5 the mean Dice is pulled down
+by ET predicted in a patient without ET (ET Dice 0 by the BraTS convention),
+while its WT Dice is 0.84.
 
 ---
 
@@ -599,7 +666,10 @@ easy to learn. Once the network has seen degraded scans in training, it
 already learns to ignore unreliable fine detail, which is exactly the job
 the band split was meant to do. That M5, which never sees the high band,
 matches M4 suggests the networks lean on low-frequency content anyway,
-consistent with the low band carrying 92-97 % of the image power (3.6).
+consistent with the low band carrying 92-97 % of the image power and with
+the high band being mostly degradation from SNR 5 on (3.6). The premise of
+the design was right; the network simply did not need the split to act on
+it.
 
 **Statistical versus practical significance.** H1 and H3 were significant
 in the wrong direction at a difference of about 0.004 Dice. With 74 paired
@@ -612,7 +682,10 @@ better".
 **Clinical reading.** A segmentation that mislabels distant tissue as tumor
 inflates volume and fragments the lesion even when overlap looks
 acceptable; M0's false-tumor volume and HD95 under noise show this
-directly, and the volume analysis (4.5) shows its consequence: M0's
+directly, and the volume analysis (4.5) shows its consequence. Part of
+that failure, tumor drawn outside the brain, would be removed by the brain
+masking any clinical pipeline applies (4.4); the rest, inside the brain,
+would not: M0's
 per-patient WT volume could be off by up to about 73 cm^3 at the worst
 condition, while the augmented models stayed within the same roughly
 +/-35 cm^3 limits they had on clean scans. A median 7 % WT volume error is in
@@ -665,7 +738,10 @@ frequency-specific architectures of this kind.
 - **Pre-registration is internal** (a dated decision log in the repository),
   not a public registry.
 - MATLAB figure noise realisations differ from the Python test set (same
-  statistics). `[TEAM: plus the k-space parity gap of 3.6, if not closed.]`
+  statistics).
+- **No post-processing.** Predictions were evaluated raw, as pre-specified;
+  brain masking (4.4) or connected-component filtering would reduce false
+  tumor, mostly for M0.
 
 ## 7. Conclusion
 

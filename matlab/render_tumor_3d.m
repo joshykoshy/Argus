@@ -31,8 +31,9 @@ if nargin < 6, ttl = ''; end
 if nargin < 7, stl_prefix = ''; end
 sp = double(spacing(1:3));
 % isosurface returns vertices as (x = column, y = row, z = slice), in voxels.
-% Convert to mm with the matching spacing order.
-tomm = @(v) (v - 1) .* sp([2 1 3]);
+% Convert to mm with the matching spacing order. reshape keeps an empty mesh
+% (absent region, e.g. no ET in some LGG) as 0x3 instead of failing.
+tomm = @(v) (reshape(v, [], 3) - 1) .* sp([2 1 3]);
 
 regions = {@(L) L > 0, @(L) L == 1 | L == 3 | L == 4, @(L) L == 3 | L == 4};
 names = {'WT', 'TC', 'ET'};

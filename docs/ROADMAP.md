@@ -103,8 +103,11 @@ folder would mix models).
       -> done 2026-10-12 on seed-0 predictions (DEC-005 conditions, M0/M1/M4/M5/M6):
          check_pred_grid.m 0 voxels differ; results/volumetrics_pred.csv, results/agreement_stage3.csv,
          figures/agreement_stage3_*.png; written up in PAPER_DRAFT.md 4.5
-- [ ] 3.4 Diagnostic report panel 4 (prediction overlay) for the 5 patients
-- [ ] 3.5 3D comparisons M0 vs M4 with error heatmaps
+- [x] 3.4 Diagnostic report panel 4 (prediction overlay) for the 5 patients
+- [x] 3.5 3D comparisons M0 vs M4 with error heatmaps
+      -> done 2026-10-12: degrade_volume.m (MATLAB port of the DEC-005 physics, parity 1.1e-6),
+         diagnostic and render3d_stage3 figures at the worst condition; spectral_check rerun on
+         DEC-005; 24 % of M0's worst-condition WT lies outside the brain (pred_outside_brain.csv)
 
 ## Stage 4 - Statistics and verdicts (Nazir; you check)
 - [x] 4.0 Statistics pipeline rebuilt to match the paper's H1-H3 (Nazir, 2026-10-06):

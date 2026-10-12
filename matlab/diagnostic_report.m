@@ -15,12 +15,14 @@
 % PANELS (axial slice with the largest true WT area; 192x192 crop = what the
 % network sees, python/data/preprocess.py rows 24:216, cols 28:220):
 %   1  FLAIR, clean
-%   2  FLAIR degraded at SNR 8, r 0.5 (worst condition), via the parity-verified
-%      degrade_slice.m. Noise: MATLAB RandStream, seed 42 (the Python test noise
-%      uses a SHA256-seeded torch generator that MATLAB cannot replay; the noise
-%      is statistically identical, the exact realisation differs).
+%   2  FLAIR at the DEC-005 worst condition (SNR 3, r 0.5, 5 mm slices, noise in
+%      the acquired k-space band), via the parity-verified degrade_volume.m
+%      applied to the whole volume. Noise: MATLAB RandStream, seed 42 (the Python
+%      test noise uses a SHA256-seeded torch generator that MATLAB cannot replay;
+%      the noise is statistically identical, the exact realisation differs).
 %   3  ground-truth overlay (WT blue, TC orange, ET red outlines)
-%   4  prediction overlay - placeholder until Stage 3 (set USE_PREDICTIONS)
+%   4  prediction overlays at the worst condition, seed 0: M0 (clean-trained)
+%      and M4 (dual-stream), with each model's 3D Dice for this patient
 %   5  band decomposition of the degraded input at D0 = 0.20 (decompose_slice.m):
 %      low band, high band, and the clean image's high band for comparison
 % Intensities follow the network's input pipeline: degrade raw intensities,
@@ -33,15 +35,19 @@ DATA_ROOT  = 'archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData';
 GT_CSV     = 'results/volumetrics_gt.csv';
 SEL_CSV    = 'results/diagnostic_selection.csv';
 OUT_FMT    = 'figures/diagnostic_%d_%s.png';
-SNR = 8;  R = 0.5;  D0 = 0.20;  SEED = 42;
+COND = struct('snr', 3, 'r', 0.5, 'thick', 5);  D0 = 0.20;  SEED = 42;
+WORST_ID = 'kspace_snr3_r0.5_t5';
 ROWS = 25:216;  COLS = 29:220;
-USE_PREDICTIONS = false;              % Stage 3 only, when ALL predictions exist
-PRED_FMT   = 'results/predictions/%s_%s_kspace_snr3_r0.5_t5.nii.gz';
-PRED_MODEL = 'M4';
+USE_PREDICTIONS = true;               % Stage 3: all seed-0 predictions exist
+PRED_FMT    = ['results/predictions/%s_%s_' WORST_ID '.nii.gz'];
+PRED_MODELS = {'M0', 'M4'};
+RAW_CSV     = 'results/raw_metrics_v2.csv';   % per-patient 3D Dice (evaluate_v2.py)
 COL = [0.00 0.45 0.70; 0.95 0.60 0.00; 0.85 0.15 0.15];
 
 %% ---- 1. Blind selection from ground truth ----
 gt = readtable(GT_CSV, 'TextType', 'string');
+raw = readtable(RAW_CSV, 'TextType', 'string');
+raw = raw(raw.seed == 0 & raw.condition_id == WORST_ID, :);
 wt = gt(gt.region == "WT", :);
 et = gt(gt.region == "ET", :);
 [~, ia] = ismember(wt.patient_id, et.patient_id);
@@ -83,8 +89,9 @@ for c = 1:height(sel)
     x = fl(:, :, z);  bm = brain3(:, :, z);  L = lab(:, :, z);
 
     rs = RandStream('mt19937ar', 'Seed', SEED);
-    nr = randn(rs, size(x), 'single');  ni = randn(rs, size(x), 'single');
-    xd = degrade_slice(x, mu, SNR, R, nr, ni);
+    nr = randn(rs, size(fl), 'single');  ni = randn(rs, size(fl), 'single');
+    xd = degrade_volume(fl, mu, COND, nr, ni);   % whole volume: 5 mm needs neighbours
+    xd = xd(:, :, z);
 
     zs = @(im) (im - mean(im(bm))) / std(im(bm));    % brain z-score
     xc = zs(x);  xdz = zs(xd);
@@ -95,31 +102,37 @@ for c = 1:height(sel)
     bgd = xd(~imdilate(bm, strel('disk', 5)));
     snr_meas = mean(xd(bm)) / (mean(bgd) / sqrt(pi / 2));
 
-    pred = [];
-    pf = sprintf(PRED_FMT, PRED_MODEL, id);
-    if USE_PREDICTIONS && isfile(pf)
-        pred = niftiread(pf);  pred = pred(ROWS, COLS, z);
+    pred = cell(1, numel(PRED_MODELS));  dsc = nan(1, numel(PRED_MODELS));
+    for m = 1:numel(PRED_MODELS)
+        pf = sprintf(PRED_FMT, PRED_MODELS{m}, id);
+        if USE_PREDICTIONS && isfile(pf)
+            P = niftiread(pf);  pred{m} = P(ROWS, COLS, z);
+            dsc(m) = raw.dice_mean(raw.model == PRED_MODELS{m} & raw.patient_id == id);
+        end
     end
 
-    f = figure('Visible', 'off', 'Position', [50 50 1500 820]);  theme(f, 'light');
-    tl = tiledlayout(f, 2, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
+    f = figure('Visible', 'off', 'Position', [50 50 1850 820]);  theme(f, 'light');
+    tl = tiledlayout(f, 2, 5, 'TileSpacing', 'compact', 'Padding', 'compact');
     show = @(im, lims, ttl) imshow_(nexttile, rot90(im), lims, ttl);
     show(xc,  [-2 4], '1  FLAIR, clean');
-    show(xdz, [-2 4], sprintf('2  FLAIR, SNR %d, r %.1f', SNR, R));
+    show(xdz, [-2 4], sprintf('2  FLAIR, SNR %d, r %.1f, %d mm', COND.snr, COND.r, COND.thick));
     ax = show(xc, [-2 4], '3  Ground truth');  outline_(ax, L, COL);
-    ax = show(xdz, [-2 4], sprintf('4  Prediction (%s, SNR %d, r %.1f)', PRED_MODEL, SNR, R));
-    if isempty(pred)
-        text(ax, 96, 96, {'awaiting predictions', '(Stage 3)'}, 'Color', 'w', ...
-            'HorizontalAlignment', 'center', 'FontSize', 13, 'FontWeight', 'bold');
-    else
-        outline_(ax, pred, COL);
+    for m = 1:numel(PRED_MODELS)
+        ax = show(xdz, [-2 4], sprintf('4%c  %s on input 2 (3D Dice %.2f)', 'a' + m - 1, ...
+            PRED_MODELS{m}, dsc(m)));
+        if isempty(pred{m})
+            text(ax, 96, 96, {'awaiting predictions', '(Stage 3)'}, 'Color', 'w', ...
+                'HorizontalAlignment', 'center', 'FontSize', 13, 'FontWeight', 'bold');
+        else
+            outline_(ax, pred{m}, COL);
+        end
     end
     show(lo,  [-2 4],     sprintf('5a  Low band of input 2 (D_0 = %.2f)', D0));
     show(hi,  [-1.5 1.5], '5b  High band of input 2');
     show(hic, [-1.5 1.5], '5c  High band of clean input 1');
 
     % Text card
-    ax = nexttile;  axis(ax, 'off');
+    ax = nexttile([1 2]);  axis(ax, 'off');
     v = gt(gt.patient_id == id, :);
     card = {
         sprintf('\\bf%s\\rm', strrep(id, '_', '\_'))
@@ -132,9 +145,10 @@ for c = 1:height(sel)
         bio_(v, 3, 'ET')
         ''
         '\bfDegradation of panel 2\rm'
-        sprintf('noise \\sigma = \\mu_{brain} / %d', SNR)
+        sprintf('noise \\sigma = \\mu_{brain} / %d, in acquired k-space band', COND.snr)
         sprintf('measured slice SNR %.1f', snr_meas)
-        sprintf('k-space kept: central %d%% per axis', round(100 * R))
+        sprintf('k-space kept: central %d%% per axis', round(100 * COND.r))
+        sprintf('slice thickness %d mm (mean of %d slices)', COND.thick, COND.thick)
     };
     text(ax, 0, 1, card, 'VerticalAlignment', 'top', 'FontSize', 11, 'Interpreter', 'tex');
     h = gobjects(3, 1);  hold(ax, 'on');
