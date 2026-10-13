@@ -59,9 +59,8 @@ viz3d/                  interactive 3D viewer (Plotly) and the paper's 3D figure
 results/                train_v3/ checkpoints and logs, raw_metrics_v2.csv, morphometric CSVs
 tables/                 statistics output (hypotheses, secondary tests, curves, noise floor)
 figures/                all figures
-docs/                   paper (docs/paper/), draft, decisions, lab notebook, roadmap, results summary
+docs/                   paper (docs/paper/), long-form draft, decisions log, lab notebook, results summary
 tests/                  pytest suite (65 tests: physics, metrics, stats, splits, evaluation, viewer, parity)
-legacy/                 the superseded v1 pipeline, kept for transparency (see legacy/README.md)
 ```
 
 ## Reproducing

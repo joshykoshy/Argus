@@ -1,7 +1,7 @@
 # Related Work
 
 Citation keys in `[@key]` form refer to `docs/paper/references.bib`. Every cited paper was opened (abstract or
-landing page) while writing this section; see `docs/paper/references_check.md` for what "opened" covers.
+landing page) while writing this section; the `verified` field of each entry in `references.bib` records what was read.
 
 ## Low-field and portable MRI
 

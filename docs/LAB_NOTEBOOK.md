@@ -9,8 +9,7 @@ fixed. It is written to serve two readers:
 2. **You, later** - each step explains the idea in plain words first, then the
    technical detail.
 
-Progress tracker: [`ROADMAP.md`](ROADMAP.md). Each section below matches a
-roadmap step.
+Each section below matches a step of the study.
 
 ---
 
@@ -20,7 +19,7 @@ Six pictures that explain the whole project. Details for each are further down.
 
 ### 1. What the scans look like, and what "worse scanner" means
 
-![Gallery](../figures/gallery_cases.png)
+![Diagnostic case 2](../figures/diagnostic_2_BraTS20_Training_167.png)
 
 Each column is one test patient (chosen by a fixed rule, Step 1.4). **Row 1**
 is a normal hospital scan (FLAIR: tumor and swelling show up bright).
@@ -307,7 +306,7 @@ slices, validate on full volumes, report false-tumor volume.
 Whichever set the team picks must be written down before results are seen,
 otherwise it looks like the hypotheses were chosen to fit. Given C2, all of
 `stats.py`'s thresholds (0.15, 0.10) will fail too. Assigned: decision to
-Mayank, implementation to Nazir (`docs/handoff/`).
+Mayank, implementation to Nazir.
 
 ### Update 2026-10-06: M5-M7 trained, C1 confirmed in the results
 
@@ -955,10 +954,7 @@ Results (all in a temp folder, deleted after; never touches
   files, so the real pipeline is unaffected, but any MATLAB code that writes
   per-condition NIfTIs must add `.nii`.)
 
-What the Stage 3 volume-error figure will look like (FAKE data, for layout
-only; stored in `docs/dryrun/`, deliberately not in `figures/`):
-
-![Dry run volume error](dryrun/agreement_dryrun_volume_error.png)
+(The dry run's figures use FAKE data and are written to a temp folder only.)
 
 ---
 
@@ -1147,6 +1143,3 @@ Anything reported earlier that turned out wrong, so nothing silently changes.
 | `figures/pipeline_physics.png` | the explainer figure |
 | `matlab/agreement_report.m` | Stage 3 agreement analysis (ready to run) |
 | `matlab/test_stage3_pipeline.m` | end-to-end Stage 3 dry run on fake predictions |
-| `docs/dryrun/*.png` | dry-run figures (FAKE data, layout check only) |
-| `matlab/figure_gallery.m` | picture-tour gallery of the 5 patients |
-| `figures/gallery_cases.png` | the gallery |

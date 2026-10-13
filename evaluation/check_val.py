@@ -1,5 +1,5 @@
 """
-Acceptance checks for evaluate_v2 on the VALIDATION patients (brief: docs/handoff/TASK_NAZIR_STEP_D.md).
+Acceptance checks for evaluate_v2 on the VALIDATION patients.
 Run on Colab after `python -m evaluation.evaluate_v2 --split val`; needs a GPU only for check 3.
 
   1. Dice reproduces the training logs: per (model, seed) the mean 3D Dice over the 37 validation

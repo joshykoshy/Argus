@@ -1,6 +1,6 @@
 """
 Step D: evaluate the 15 trained models (M0, M1, M4, M5, M6 x seeds 0, 1, 2) on full 3D volumes
-under the 13 DEC-005 conditions (docs/DECISIONS.md DEC-005, DEC-007; brief: docs/handoff/TASK_NAZIR_STEP_D.md).
+under the 13 DEC-005 conditions (docs/DECISIONS.md DEC-005, DEC-007).
 
 Inference recipe is exactly training.train_v2.validate(): degrade_volume -> normalise -> model in
 slices of 32 -> sigmoid output > 0.5 -> WT / TC / ET. Each (patient, condition) volume is degraded

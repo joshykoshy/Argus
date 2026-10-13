@@ -1,6 +1,6 @@
 # Paper draft
 
-Status: **full draft for the team** (roadmap Stage 5), rewritten 2026-10-12 for
+Status: **long-form working draft** (the IEEE version is `docs/paper/main.tex`), rewritten 2026-10-12 for
 the redesigned study (DEC-005, DEC-006, DEC-007) and the test-set results in
 `results/raw_metrics_v2.csv` / `docs/RESULTS_STATS.md`. Every number is
 traceable to a file. Square-bracket notes:
@@ -8,7 +8,7 @@ traceable to a file. Square-bracket notes:
 - `[MATLAB: ...]` - a number or figure from Stage 3 (morphometrics on the
   real predictions); the slot says which script produces it.
 - `[TEAM: ...]` - a decision or check the team still has to make.
-- References: verified 2026-10-12 (`docs/paper/references_check.md`, BibTeX in
+- References: verified 2026-10-12 (the `verified` field of each entry in
   `docs/paper/references.bib`). Entries marked "metadata only" there still need
   their content checked before submission.
 
@@ -772,7 +772,7 @@ became unreliable even though their average error was close to zero.
 
 ## References
 
-Verified 2026-10-12 against Crossref / PubMed / arXiv: details in `docs/paper/references_check.md`,
+Verified 2026-10-12 against Crossref / PubMed / arXiv: the `verified` field of each entry records what was checked;
 BibTeX in `docs/paper/references.bib`. The related-work references are in that file and are not repeated here.
 
 - Anazodo UC, Ng JJ, et al. A framework for advancing sustainable magnetic resonance

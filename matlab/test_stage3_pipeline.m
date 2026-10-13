@@ -71,8 +71,7 @@ OUT_CSV = fullfile(TMP, 'vol_pred.csv');
 run('matlab/volumetrics.m');
 PRED_CSV = OUT_CSV;  OUT_DIR = TMP;  FIG_DIR = TMP;  TAG = 'dryrun';  COMPARE = {'M0', 'M4'};
 run('matlab/agreement_report.m');
-if ~isfolder('docs/dryrun'), mkdir('docs/dryrun'); end
-copyfile(fullfile(TMP, 'agreement_dryrun_*.png'), 'docs/dryrun');   % FAKE data: kept out of figures/
+fprintf('Dry-run figures (FAKE data) left in %s\n', TMP);
 
 % 3. Known answers (Step 1.2 values, results/agreement_validation.csv)
 S = readtable(fullfile(TMP, 'agreement_dryrun.csv'), 'TextType', 'string');
