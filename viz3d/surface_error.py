@@ -12,7 +12,7 @@ from scipy import ndimage as ndi
 
 from viz3d import meshes
 
-DATA_ROOT = Path("/Volumes/PortableSSD/ORVYN/archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData")
+DATA_ROOT = meshes.DATA_ROOT
 
 PERTURB_MM = 2.0
 

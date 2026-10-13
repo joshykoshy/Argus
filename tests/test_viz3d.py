@@ -5,7 +5,7 @@ import pytest
 
 from viz3d import meshes, surface_error, viewer
 
-DATA_ROOT = Path("/Volumes/PortableSSD/ORVYN/archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData")
+DATA_ROOT = meshes.DATA_ROOT
 
 needs_data = pytest.mark.skipif(not DATA_ROOT.is_dir(), reason="BraTS data root not mounted")
 
@@ -102,7 +102,7 @@ def test_only_real_files_listed():
 @pytest.mark.parametrize("case", ["281", "008"])
 def test_viewer_truth_only(case, tmp_path):
     out = viewer.build_viewer(DATA_ROOT, case, tmp_path)
-    html = out.read_text()
+    html = out.read_text(encoding="utf-8")
     assert out.name == f"BraTS20_Training_{case}_truth.html"
     assert "Mesh3d" in html or "mesh3d" in html
     seg, sp, _ = meshes.load_seg(DATA_ROOT, case)

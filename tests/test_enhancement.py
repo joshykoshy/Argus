@@ -14,7 +14,7 @@ import pytest
 
 
 def test_enhancement_correlation_matlab_python():
-    matlab_dir = Path("C:/Users/Mayan/.gemini/antigravity/scratch/ecte408/matlab/reference")
+    matlab_dir = Path(str(Path(__file__).resolve().parents[1]) + "/matlab/reference")
     in_mat = matlab_dir / "enhancement_test_in.mat"
     out_mat = matlab_dir / "enhancement_test_out.mat"
 

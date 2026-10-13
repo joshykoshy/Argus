@@ -19,3 +19,6 @@ figures/interactive/*.html
 # Step D outputs (large / validation scratch)
 predictions/
 results/val_check/
+
+# Downloaded archives (BraTS, prediction bundles)
+*.zip

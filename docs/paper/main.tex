@@ -142,8 +142,10 @@ shows a clean and a worst-condition slice.
 Each degraded, brain-z-scored slice is split with complementary Gaussian filters in the centred Fourier domain,
 $H_{\mathrm{lp}} = \exp(-D^2/2D_0^2)$ and $H_{\mathrm{hp}} = 1 - H_{\mathrm{lp}}$, with $D$ the radius normalised
 to Nyquist and $D_0 = 0.20$. The bands sum exactly to the input (reconstruction error $5\times10^{-7}$), so the
-split discards no information. $D_0$ is a design choice motivated by the spectral analysis
-(Section~\ref{sec:spectral}). \team{confirm wording (C5)}
+split discards no information. $D_0$ was fixed as a design choice motivated by the spectral analysis
+(Section~\ref{sec:spectral}), where 92--97\% of clean-image power lies below it; an early search over
+$D_0 \in \{0.10, 0.15, 0.20, 0.30\}$ on three validation patients was too weak to select it empirically, and
+other cutoffs were not tested.
 
 \subsection{Models and Training}
 All models are 2D U-Nets with five levels, instance normalisation and LeakyReLU, outputting sigmoid WT, TC and
@@ -200,8 +202,9 @@ ground truths with known synthetic damage (dilation, erosion, shift, deleted and
 \label{sec:spectral}
 The degradation was re-implemented independently in MATLAB and compared with the Python function used for
 training and evaluation on identical inputs and noise for all 13 conditions; the largest difference was
-$1.1\times10^{-6}$ of the mean brain intensity (float32 rounding). The decomposition matched the PyTorch code
-for four cutoffs. \team{report measured value of the decomposition parity test} Two independent 3D renderers
+$1.1\times10^{-6}$ of the mean brain intensity (float32 rounding). The MATLAB decomposition matched the PyTorch
+code on five random slices for all four cutoffs with a maximum absolute difference of $4.8\times10^{-7}$
+(intensities in $[0.1, 1]$). Two independent 3D renderers
 (MATLAB and Python) agree on the surface-error measure within 0.5~mm on the cases of Fig.~\ref{fig:viz3dA}.
 
 On the largest-tumor slice of 12 test patients, 95.1\% (FLAIR) and 91.9\% (T1ce) of clean spectral power lies
@@ -357,7 +360,8 @@ high band of the clean input.}
 \caption{3D comparison at the worst condition, cases 1--3 (HGG small, typical, large), seed 0. Left: ground
 truth (WT blue, TC orange, ET red) in a faint brain surface. Middle and right: predicted WT surface of M0 and M4,
 coloured by signed distance to the true WT boundary (red outside, blue inside, $\pm5$~mm). Rendered with the
-\texttt{viz3d} mesh and surface-error code (Nazir).}
+\texttt{viz3d} mesh and surface-error code; interactive versions with all three conditions are produced by
+\texttt{python -m viz3d.viewer --compare}.}
 \label{fig:viz3dA}
 \end{figure*}
 
@@ -391,8 +395,11 @@ rule exists for this case.
 
 \textit{Clinical reading.} Part of M0's failure, tumor drawn outside the brain, would be removed by the brain
 masking any clinical pipeline applies; the rest would not. Augmented models kept median WT volume error near 7\%
-at the worst condition, comparable to their clean-scan error. \team{cite inter-rater volumetric variability}
-ET was least robust for every model, as expected for a thin shell: in the synthetic validation a 1~mm boundary
+at the worst condition, comparable to their clean-scan error. For scale, expert raters agree on preoperative
+glioma volume with ICC(A,1) of 0.92 (grade II--III) to 0.99 (glioblastoma enhancing tumor), and novices on
+grade II--III glioma with 0.73~\cite{visser2019interrater}. The augmented models' worst-condition WT ICC
+(0.93--0.94) lies at the lower end of the expert range, and M0's (0.74) at novice level, although that study
+rated different regions on clinical scans. ET was least robust for every model, as expected for a thin shell: in the synthetic validation a 1~mm boundary
 error changed ET volume by a median 48\% but WT by 17\%. A near-zero bias can coexist with large per-patient
 error, and a biased method can keep a high ICC (a systematic +17\% error gave ICC 0.957 in the synthetic
 validation), so bias, limits of agreement and ICC must be reported together. Every model predicted ET in

@@ -106,7 +106,7 @@ def test_matlab_python_parity():
     Exports clean slices and shared noise to .mat, runs MATLAB reference degrade_slice & decompose_slice,
     and asserts max absolute difference < 1e-4 (float32).
     """
-    matlab_dir = Path("C:/Users/Mayan/.gemini/antigravity/scratch/ecte408/matlab/reference")
+    matlab_dir = Path(str(Path(__file__).resolve().parents[1]) + "/matlab/reference")
     test_mat_path = matlab_dir / "parity_test_data.mat"
     res_mat_path = matlab_dir / "parity_matlab_results.mat"
 

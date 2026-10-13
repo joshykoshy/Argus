@@ -11,7 +11,7 @@ from python.data.splits import create_stratified_split, load_splits
 
 
 def test_manifest_completeness():
-    manifest_path = Path("C:/Users/Mayan/.gemini/antigravity/scratch/ecte408/data/manifest.csv")
+    manifest_path = Path(str(Path(__file__).resolve().parents[1]) + "/data/manifest.csv")
     if not manifest_path.exists():
         raw_dir = r"C:\Users\Mayan\.cache\kagglehub\datasets\awsaf49\brats20-dataset-training-validation\versions\1\BraTS2020_TrainingData\MICCAI_BraTS2020_TrainingData"
         mapping_csv = f"{raw_dir}/name_mapping.csv"
@@ -24,9 +24,9 @@ def test_manifest_completeness():
 
 
 def test_split_no_leakage():
-    split_path = Path("C:/Users/Mayan/.gemini/antigravity/scratch/ecte408/data/splits/split_v1.json")
+    split_path = Path(str(Path(__file__).resolve().parents[1]) + "/data/splits/split_v1.json")
     if not split_path.exists():
-        manifest_path = "C:/Users/Mayan/.gemini/antigravity/scratch/ecte408/data/manifest.csv"
+        manifest_path = str(Path(__file__).resolve().parents[1]) + "/data/manifest.csv"
         df = pd.read_csv(manifest_path)
         splits = create_stratified_split(df, output_json=str(split_path))
     else:

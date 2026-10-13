@@ -3,6 +3,7 @@
 Meshes are in millimetres, in the scan's own voxel grid: vertex = voxel_index * spacing,
 so voxel centre (i, j, k) sits at (i, j, k) * spacing. No affine is applied.
 """
+import os
 import re
 from pathlib import Path
 
@@ -11,7 +12,8 @@ import numpy as np
 from scipy import ndimage as ndi
 from skimage import measure
 
-DATA_ROOT = Path("/Volumes/PortableSSD/ORVYN/archive/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData")
+# BraTS root: $BRATS_ROOT, else the repo-relative archive/ folder (see README).
+DATA_ROOT = Path(os.environ.get("BRATS_ROOT", Path(__file__).resolve().parents[1] / "archive" / "BraTS2020_TrainingData" / "MICCAI_BraTS2020_TrainingData"))
 
 SIGMA_MM = 0.5   # Gaussian pre-smoothing of the binary mask before marching cubes
 LEVEL = 0.5

@@ -12,12 +12,9 @@ traceable to a file. Square-bracket notes:
   `docs/paper/references.bib`). Entries marked "metadata only" there still need
   their content checked before submission.
 
-Working title `[TEAM: pick one]`:
-- *Degradation-aware training, not frequency-band decomposition, makes brain
-  tumor segmentation robust to simulated low-field MRI*
-- *Does frequency-band decomposition make brain tumor segmentation robust to
-  low-field MRI degradation? A pre-registered negative result with
-  morphometric validation*
+Title: *Degradation-aware training, not frequency-band decomposition, makes
+brain tumor segmentation robust to simulated low-field MRI*. IEEE-format
+version: `docs/paper/main.tex` / `main.pdf`.
 
 ---
 
@@ -137,11 +134,11 @@ the same training data fed to a conventional network.
 
 ## 2. Related work
 
-See `docs/paper/related_work.md` (Nazir, references verified). It covers
-low-field and portable MRI, deep-learning tumor segmentation, robustness to
-noise, resolution and domain shift, frequency-domain and multi-band networks,
-and volumetric agreement. `[TEAM: merge into this file at final assembly;
-its citation keys are already in references.bib.]`
+Full text: `docs/paper/related_work.md` (references verified); a condensed
+version is merged into `docs/paper/main.tex`. It covers low-field and portable
+MRI, deep-learning tumor segmentation, robustness to noise, resolution and
+domain shift, frequency-domain and multi-band networks, and volumetric
+agreement.
 
 ---
 
@@ -240,10 +237,10 @@ with D0 = 0.20. A Gaussian rather than an ideal (hard circular) cutoff avoids
 ringing artefacts. Because H_lp + H_hp = 1 at every frequency, the bands sum
 exactly to the input (maximum reconstruction error 5.1e-7, float32
 rounding), so the decomposition discards no information; it only rearranges
-it. D0 = 0.20 is a design choice motivated by the spectral analysis
-(Section 3.6: the low band carries 92-97 % of image power); an early proxy
-search on validation data was too weak to select it empirically.
-`[TEAM: confirm this wording (finding C5).]`
+it. D0 = 0.20 was fixed as a design choice motivated by the spectral
+analysis (Section 3.6: 92-97 % of clean-image power lies below it); an early
+search over D0 in {0.10, 0.15, 0.20, 0.30} on three validation patients was
+too weak to select it empirically, and other cutoffs were not tested.
 
 ### 3.4 Models
 
@@ -343,9 +340,9 @@ for all 13 conditions (`test_degrade_volume_parity.m`). The largest
 difference was 4.3e-4 intensity units, 1.1e-6 of the mean brain intensity,
 i.e. float32 rounding (`results/degrade_volume_parity.csv`). The
 decomposition (`decompose_slice.m`) matched the PyTorch code on five random
-slices for four cutoffs D0 in {0.10, 0.15, 0.20, 0.30}
-(`tests/test_degradation.py::test_matlab_python_parity`, tolerance 1e-4
-`[TEAM: report the measured value]`). Rerunning the MATLAB side on a second
+slices for four cutoffs D0 in {0.10, 0.15, 0.20, 0.30} with a maximum
+absolute difference of 4.8e-7 for intensities in [0.1, 1]
+(`tests/test_degradation.py::test_matlab_python_parity`, tolerance 1e-4). Rerunning the MATLAB side on a second
 machine and MATLAB version (R2026b vs R2025a) reproduced the stored outputs
 exactly (`matlab/env_check.m`).
 
@@ -469,8 +466,7 @@ per-patient value, from `results/raw_metrics_v2.csv` (14,430 rows) via
 | 3 | 0.5 | 1 | 0.558 | 0.779 | 0.774 | 0.773 | 0.779 |
 | 3 | 0.5 | 5 | **0.549** | **0.768** | **0.765** | **0.763** | **0.769** |
 
-`[TEAM: turn this into Figure 2, Dice vs condition with CI bands, from
-dice_curves.csv.]`
+Figure: `figures/dice_curves.png` (`docs/paper/fig_dice_curves.py`).
 
 The clean-trained M0 lost accuracy under every degradation, and noise was
 the dominant factor: SNR 8 alone cost it 0.099 Dice, going from SNR 8 to
@@ -688,11 +684,14 @@ masking any clinical pipeline applies (4.4); the rest, inside the brain,
 would not: M0's
 per-patient WT volume could be off by up to about 73 cm^3 at the worst
 condition, while the augmented models stayed within the same roughly
-+/-35 cm^3 limits they had on clean scans. A median 7 % WT volume error is in
-the range usually reported between expert raters `[CITE: inter-rater
-volumetric variability in glioma, e.g. BraTS or RANO literature - TEAM to
-source and verify]`; the augmented models' ET error (about 18 %) is larger,
-as expected for a thin shell (below). Two practical warnings: a near-zero
++/-35 cm^3 limits they had on clean scans. For scale, expert raters agree on
+preoperative glioma volume with ICC(A,1) of 0.92 (grade II-III) to 0.99
+(glioblastoma enhancing tumor), and novices on grade II-III glioma with 0.73
+[Visser 2019]. The augmented models' worst-condition WT ICC (0.93-0.94) lies
+at the lower end of the expert range and M0's (0.74) at novice level,
+although that study rated different regions on clinical scans. The augmented
+models' ET error (about 18 %) is larger, as expected for a thin shell
+(below). Two practical warnings: a near-zero
 mean bias can coexist with large per-patient error, so agreement must be
 judged from the limits of agreement and ICC; and every model predicted ET in
 patients who have none, so ET presence from these models should not be
@@ -792,6 +791,8 @@ BibTeX in `docs/paper/references.bib`. The related-work references are in that f
 - Ogbole GI, Adeyomoye AO, Badu-Peprah A, Mensah Y, Nzeh DA. Survey of magnetic
   resonance imaging availability in West Africa. *Pan African Medical Journal*
   2018;30:240.
+- Visser M, Muller DMJ, van Duijn RJM, et al. Inter-rater agreement in glioma
+  segmentations on longitudinal MRI. *NeuroImage: Clinical* 2019;22:101727.
 - Ronneberger O, Fischer P, Brox T. U-Net: convolutional networks for
   biomedical image segmentation. *MICCAI* 2015.
 - Sheth KN, et al. Assessment of brain injury using portable, low-field
