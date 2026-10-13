@@ -58,6 +58,14 @@ The four augmented models are within about 0.012 Dice of each other at every con
   was the separate Step A run. Its seed SD (0.048) is about ten times that of the augmented models. Worth a sentence in the paper: the clean-trained model is
   also the least stable across training seeds.
 
+## Sensitivity analysis: brain-masked predictions (post hoc)
+
+Much of M0's false tumour under noise lies outside the brain. Zeroing predictions outside the brain mask and
+repeating M4 vs M0 on all seeds (`evaluation/evaluate_masked.py`, `tables/masked_secondary_tests.csv`): worst
+condition +0.126 Dice (95 % CI 0.112 to 0.142), beyond training noise (2 x seed SD 0.040); SNR 5 +0.059 and
+clean +0.036, both within training noise. The augmentation effect at the worst condition is real but about
+40 % smaller than the unmasked +0.216.
+
 ## Caveats
 
 - Three seeds only, so the seed SD itself is a rough estimate.

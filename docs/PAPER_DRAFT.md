@@ -555,8 +555,22 @@ A brain mask, standard in any clinical pipeline, would remove most of M0's
 deficit at SNR 5 and about half of it at the worst condition; the augmented
 models remain clearly better there (WT Dice +0.10, half the volume error).
 The pre-registered comparisons between augmented models are unaffected.
-`[TEAM: decide whether to also report the masked M4 vs M0 secondary test on
-all seeds; the effect size +0.216 in 4.3 includes out-of-brain tumor.]`
+Repeated on brain-masked predictions of all three seeds (inference rerun on CPU
+with the same checkpoints, `evaluation/evaluate_masked.py`, post hoc;
+`tables/masked_secondary_tests.csv`):
+
+| M4 - M0, masked | Mean diff (95 % CI) | Holm p | 2 x seed SD | Reading |
+|---|---|---|---|---|
+| worst | +0.126 (0.112, 0.142) | 2e-13 | 0.040 | Real (unmasked: +0.216) |
+| SNR 5 | +0.059 (0.050, 0.068) | 2e-13 | 0.099 | Within training noise |
+| clean | +0.036 (0.029, 0.043) | 2e-12 | 0.096 | Within training noise |
+
+Masking cut M0's mean false tumor at the worst condition from 19.7 to
+3.2 cm^3. About 40 % of the unmasked worst-condition gain is tumor drawn
+outside the brain; the remaining +0.13 is robust. The CPU rerun draws
+different (statistically identical) noise from the GPU run, so individual
+raw scores differ slightly from `raw_metrics_v2.csv` (clean scans agree to
+1e-4); the model averages agree (M0 worst 0.549 in both).
 
 M0 was also the least reproducible model: the seed-to-seed SD of its clean
 Dice was 0.048, against 0.0004-0.005 for the augmented models

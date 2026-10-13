@@ -31,7 +31,8 @@ a dual-stream frequency-band network (M4), a low-band-only ablation (M5) and an 
 hypotheses comparing M4 with M1 and M6 were pre-registered before training. Training on degraded data was the
 decisive factor: at the worst condition the augmented models reached a mean 3D Dice of 0.763--0.769 against
 0.549 for the baseline, and removed its spurious tumor on tumor-free slices (0.4 vs 19.8~cm$^3$), about a
-quarter of which lay outside the brain. None of the pre-registered hypotheses was supported: the dual-stream
+quarter of which lay outside the brain; with predictions masked to the brain the gain remained $+0.13$ Dice
+(95\% CI 0.11--0.14). None of the pre-registered hypotheses was supported: the dual-stream
 network did not beat the plain augmented U-Net or early fusion (differences $-0.004$, below twice the
 seed-to-seed SD). Tumor volumes of the augmented models stayed as reliable at the worst condition as on clean
 scans (median whole-tumor error about 7\%, ICC 0.93--0.94); the baseline's error rose to 26\% (ICC 0.74) while
@@ -295,8 +296,14 @@ it outside the brain. On seed-0 predictions, 24\% of M0's predicted WT volume at
 per patient) lay outside the brain mask, against under 1\% for the augmented models. No post-processing was
 pre-specified; as a sensitivity analysis, masking predictions to the brain raises M0's seed-0 WT Dice from 0.78
 to 0.88 at SNR~5 and from 0.65 to 0.76 at the worst condition, leaving the augmented models clearly better at the
-worst condition (WT Dice $+0.10$, half the volume error). \team{masked M4 vs M0 test on all seeds: running, fill
-in} The pre-registered comparisons are unaffected.
+worst condition (WT Dice $+0.10$, half the volume error). Repeating the secondary M4 vs M0 test on
+brain-masked predictions of all three seeds (inference rerun with the same checkpoints; post hoc), M4
+exceeded M0 by $+0.126$ mean Dice at the worst condition (95\% CI 0.112--0.142, Holm $p = 2\times10^{-13}$),
+six times M0's seed-to-seed SD (0.020) and so beyond training noise, against $+0.216$ unmasked. At SNR~5 the
+masked gain ($+0.059$, CI 0.050--0.068) and on clean scans ($+0.036$) were significant but within training
+noise (2$\times$seed SD 0.099 and 0.096). Masking cut M0's false tumor at the worst condition from 19.7 to
+3.2~cm$^3$. About 40\% of the unmasked augmentation gain at the worst condition is thus tumor drawn outside the
+brain; the remaining $+0.13$ is robust. The pre-registered comparisons are unaffected.
 
 \subsection{Morphometric Agreement}
 For the augmented models, tumor volume stayed about as reliable at the worst condition as on clean scans
@@ -394,7 +401,9 @@ larger, so whether it reflects the architecture or these training runs cannot be
 rule exists for this case.
 
 \textit{Clinical reading.} Part of M0's failure, tumor drawn outside the brain, would be removed by the brain
-masking any clinical pipeline applies; the rest would not. Augmented models kept median WT volume error near 7\%
+masking any clinical pipeline applies; the rest would not: even masked, augmentation was worth $+0.13$ Dice at
+the worst condition, while at SNR~5 the masked gain fell within training noise. Degradation-aware training
+matters most at the harshest conditions. Augmented models kept median WT volume error near 7\%
 at the worst condition, comparable to their clean-scan error. For scale, expert raters agree on preoperative
 glioma volume with ICC(A,1) of 0.92 (grade II--III) to 0.99 (glioblastoma enhancing tumor), and novices on
 grade II--III glioma with 0.73~\cite{visser2019interrater}. The augmented models' worst-condition WT ICC

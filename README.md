@@ -30,7 +30,8 @@ slices. Prediction surfaces coloured by signed distance to the true boundary.*
 | M6 early fusion | degraded | 0.826 | 0.769 | 7.2 % | 0.94 |
 
 Dice: mean of WT/TC/ET, full 3D. Worst condition: SNR 3, in-plane resolution halved, 5 mm slices. Volume
-agreement on seed 0. Full statistics: [`docs/RESULTS_STATS.md`](docs/RESULTS_STATS.md) and `tables/`.
+agreement on seed 0. Much of M0's false tumour lies outside the brain; with predictions masked to the brain,
+the augmentation gain at the worst condition is +0.13 Dice (95 % CI 0.11-0.14) instead of +0.22. Full statistics: [`docs/RESULTS_STATS.md`](docs/RESULTS_STATS.md) and `tables/`.
 
 ## Study design
 
